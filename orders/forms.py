@@ -1,6 +1,14 @@
 from django import forms
 
-from .models import Address, Batch, Customer, Order, OrderPhoto, normalize_phone
+from .models import (
+    Address,
+    Batch,
+    Customer,
+    Order,
+    OrderPhoto,
+    Payment,
+    normalize_phone,
+)
 
 
 class OrderForm(forms.ModelForm):
@@ -94,3 +102,42 @@ class OrderForm(forms.ModelForm):
         if data.get("photo"):
             OrderPhoto.objects.create(order=order, image=data["photo"])
         return order
+
+
+class PaymentForm(forms.ModelForm):
+    class Meta:
+        model = Payment
+        fields = ["kind", "amount", "method"]
+        labels = {"kind": "Payment for", "amount": "Amount", "method": "Paid by"}
+
+
+class ShippingForm(forms.ModelForm):
+    class Meta:
+        model = Order
+        fields = ["size_band", "shipping_fee"]
+        labels = {
+            "size_band": "Item size",
+            "shipping_fee": "Shipping fee (leave empty to use the grid)",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.initial.pop("shipping_fee", None)
+        self.fields["size_band"].empty_label = "Choose size"
+
+    def clean(self):
+        cleaned = super().clean()
+        if not cleaned.get("size_band") and cleaned.get("shipping_fee") is None:
+            raise forms.ValidationError("Choose the item size or enter a fee.")
+        return cleaned
+
+
+class QuoteForm(forms.ModelForm):
+    class Meta:
+        model = Order
+        fields = ["quoted_price", "cost"]
+        labels = {"quoted_price": "Quoted price (total)", "cost": "My cost (private)"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["quoted_price"].required = True
