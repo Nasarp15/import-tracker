@@ -1,0 +1,21 @@
+{% extends "orders/base.html" %}
+
+{% block title %}New order{% endblock %}
+
+{% block content %}
+<h1>New order</h1>
+
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  {{ form.non_field_errors }}
+  {% for field in form %}
+    <div class="field">
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {{ field.errors }}
+    </div>
+  {% endfor %}
+  <button type="submit">Save order</button>
+  <a class="cancel" href="{% url 'order_list' %}">Cancel</a>
+</form>
+{% endblock %}

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Orders{% endblock %}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f5f5f3; color: #1c1c1a; }
+    header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #fff; border-bottom: 1px solid #e3e3df; }
+    header a { font-weight: 600; font-size: 18px; color: inherit; text-decoration: none; }
+    header form { margin: 0; }
+    main { max-width: 520px; margin: 0 auto; padding: 16px 16px 90px; }
+    h1 { font-size: 20px; margin: 4px 0 16px; }
+    .muted { color: #6b6b66; font-size: 13px; margin-top: 2px; }
+    input, select, textarea { width: 100%; padding: 10px; font-size: 16px; border: 1px solid #cfcfc9; border-radius: 8px; background: #fff; font-family: inherit; }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 13px; color: #55554f; margin-bottom: 4px; }
+    .errorlist { margin: 4px 0 0; padding: 0; list-style: none; color: #b3261e; font-size: 13px; }
+    button, .primary { display: block; width: 100%; padding: 12px; font-size: 16px; border: 0; border-radius: 8px; background: #1f6f5c; color: #fff; text-align: center; text-decoration: none; cursor: pointer; }
+    header button { background: none; color: #55554f; font-size: 14px; padding: 4px 8px; width: auto; }
+    .cancel { display: block; text-align: center; margin-top: 12px; color: #55554f; }
+    .chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; }
+    .chip { white-space: nowrap; padding: 5px 12px; border: 1px solid #cfcfc9; border-radius: 999px; font-size: 13px; color: #55554f; text-decoration: none; background: #fff; }
+    .chip.on { background: #e1f0ec; border-color: #1f6f5c; color: #14503f; }
+    .order { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid #e3e3df; }
+    .thumb { width: 48px; height: 48px; border-radius: 8px; background: #e8e8e4; object-fit: cover; flex: none; }
+    .info { flex: 1; min-width: 0; }
+    .right { text-align: right; flex: none; }
+    .badge { font-size: 11px; padding: 2px 8px; border-radius: 6px; background: #e8e8e4; color: #55554f; white-space: nowrap; }
+    .s-arrived { background: #fdecc8; color: #7a4b00; }
+    .s-in_transit, .s-purchased { background: #dce8fb; color: #1d4d8f; }
+    .s-shipping_paid, .s-delivered { background: #d9f0e0; color: #1d6b3a; }
+    .fab { position: fixed; left: 16px; right: 16px; bottom: 16px; max-width: 488px; margin: 0 auto; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="{% url 'order_list' %}">Orders</a>
+    {% if user.is_authenticated %}
+    <form method="post" action="{% url 'logout' %}">
+      {% csrf_token %}
+      <button type="submit">Log out</button>
+    </form>
+    {% endif %}
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

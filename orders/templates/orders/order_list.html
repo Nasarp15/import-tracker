@@ -1,0 +1,41 @@
+{% extends "orders/base.html" %}
+
+{% block content %}
+<form method="get" class="field">
+  <input type="search" name="q" value="{{ q }}" placeholder="Search name, phone or item">
+  {% if stage %}<input type="hidden" name="stage" value="{{ stage }}">{% endif %}
+</form>
+
+<nav class="chips">
+  {% for value, label in chips %}
+    <a class="chip {% if value == stage %}on{% endif %}" href="?stage={{ value }}{% if q %}&q={{ q|urlencode }}{% endif %}">{{ label }}</a>
+  {% endfor %}
+</nav>
+
+{% for order in orders %}
+  <div class="order">
+    {% with photo=order.photos.all|first %}
+      {% if photo %}
+        <img class="thumb" src="{{ photo.image.url }}" alt="">
+      {% else %}
+        <div class="thumb"></div>
+      {% endif %}
+    {% endwith %}
+    <div class="info">
+      <strong>{{ order.customer.name|default:order.customer.phone }}</strong>
+      <div class="muted">{{ order.item_notes|truncatechars:40|default:"No notes" }}</div>
+      <div class="muted">{{ order.get_source_type_display }}{% if order.batch %} · {{ order.batch.label }}{% endif %}</div>
+    </div>
+    <div class="right">
+      <span class="badge s-{{ order.stage }}">{{ order.get_stage_display }}</span>
+      {% if order.quoted_price %}
+        <div class="muted">{{ order.currency }} {{ order.quoted_price|floatformat:"-2" }}</div>
+      {% endif %}
+    </div>
+  </div>
+{% empty %}
+  <p class="muted">No orders here yet.</p>
+{% endfor %}
+
+<a class="primary fab" href="{% url 'order_create' %}">+ New order</a>
+{% endblock %}
