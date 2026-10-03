@@ -1,0 +1,14 @@
+{% extends "orders/base.html" %}
+
+{% block title %}New batch{% endblock %}
+
+{% block content %}
+<h1>New batch</h1>
+
+<form method="post">
+  {% csrf_token %}
+  {% include "orders/_fields.html" %}
+  <button type="submit">Create batch</button>
+  <a class="cancel" href="{% url 'batch_list' %}">Cancel</a>
+</form>
+{% endblock %}

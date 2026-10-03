@@ -1,0 +1,91 @@
+{% extends "orders/base.html" %}
+
+{% block title %}{{ batch.label }}{% endblock %}
+
+{% block content %}
+<style>
+  .back { color: #55554f; text-decoration: none; font-size: 14px; }
+  .card { background: #fff; border: 1px solid #e3e3df; border-radius: 12px; padding: 14px; margin: 12px 0; }
+  .card h2 { font-size: 15px; margin: 0 0 10px; }
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .top h1 { margin: 0; font-size: 18px; }
+  .msg { padding: 10px 12px; border-radius: 8px; margin: 12px 0; font-size: 14px; background: #d9f0e0; color: #1d6b3a; }
+  .msg.error { background: #fdecc8; color: #7a4b00; }
+  .brow { display: flex; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #eeeeea; }
+  .brow a { flex: 1; min-width: 0; color: inherit; text-decoration: none; }
+  .brow form { margin: 0; }
+  .rm { display: inline-block; width: auto; padding: 2px 8px; font-size: 12px; background: #fff; color: #b3261e; border: 1px solid #e3b5b1; }
+  .check { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid #eeeeea; font-size: 14px; }
+  .check input { width: auto; margin-top: 3px; }
+  .gap { margin-top: 12px; }
+</style>
+
+<p><a class="back" href="{% url 'batch_list' %}">&larr; All batches</a></p>
+
+{% for message in messages %}
+  <div class="msg {{ message.tags }}">{{ message }}</div>
+{% endfor %}
+
+<div class="card">
+  <div class="top">
+    <h1>{{ batch.label }}</h1>
+    <span class="badge {% if batch.status == 'shipped' %}s-in_transit{% elif batch.status == 'arrived' %}s-arrived{% endif %}">{{ batch.get_status_display }}</span>
+  </div>
+  <div class="muted">{{ batch.get_source_display }}</div>
+  {% if batch.shipped_on %}<div class="muted">Shipped {{ batch.shipped_on|date:"j M Y" }}</div>{% endif %}
+  {% if batch.arrived_on %}<div class="muted">Arrived {{ batch.arrived_on|date:"j M Y" }}</div>{% endif %}
+  <div class="muted">{{ total }} order{{ total|pluralize }} · {{ shipping_due }} shipping due · {{ delivered }} delivered</div>
+</div>
+
+{% if next_action %}
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="{{ next_action.0 }}">
+    <button type="submit">{{ next_action.1 }}</button>
+  </form>
+{% endif %}
+
+<div class="card">
+  <h2>Orders in this batch</h2>
+  {% for order in orders %}
+    <div class="brow">
+      <a href="{% url 'order_detail' order.pk %}">
+        <strong>{{ order.customer.name|default:order.customer.phone }}</strong>
+        <div class="muted">{{ order.item_notes|truncatechars:40|default:"No notes" }}</div>
+      </a>
+      <span class="badge s-{{ order.stage }}">{{ order.get_stage_display }}</span>
+      {% if is_open %}
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="remove_order">
+          <input type="hidden" name="order_id" value="{{ order.pk }}">
+          <button class="rm" type="submit">Remove</button>
+        </form>
+      {% endif %}
+    </div>
+  {% empty %}
+    <p class="muted">No orders in this batch yet.</p>
+  {% endfor %}
+</div>
+
+{% if is_open %}
+  <div class="card">
+    <h2>Add paid orders</h2>
+    {% if assignable %}
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_orders">
+        {% for order in assignable %}
+          <label class="check">
+            <input type="checkbox" name="order_ids" value="{{ order.pk }}">
+            <span><strong>{{ order.customer.name|default:order.customer.phone }}</strong><br><span class="muted">{{ order.item_notes|truncatechars:40|default:"No notes" }} · {{ order.get_stage_display }}</span></span>
+          </label>
+        {% endfor %}
+        <div class="gap"><button type="submit">Add selected</button></div>
+      </form>
+    {% else %}
+      <p class="muted">No paid {{ batch.get_source_display }} preorders are waiting for a batch.</p>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

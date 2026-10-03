@@ -1,11 +1,11 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from .forms import OrderForm, PaymentForm, QuoteForm, ShippingForm
-from .models import Order, Payment
+from .forms import BatchForm, OrderForm, PaymentForm, QuoteForm, ShippingForm
+from .models import Batch, Order, Payment
 from .whatsapp import arrival_link, confirmation_link
 
 STAGE_CHIPS = [
@@ -205,3 +205,124 @@ def order_detail(request, pk):
         **bal,
     }
     return render(request, "orders/order_detail.html", context)
+
+
+# ---------------------------------------------------------------- batches
+
+BATCH_NEXT = {
+    Batch.Status.ORDERING: ("ship", "Mark as shipped"),
+    Batch.Status.SHIPPED: ("arrive", "Mark as arrived"),
+    Batch.Status.ARRIVED: ("close", "Close batch"),
+}
+
+ASSIGNABLE_SOURCE = {
+    Batch.Source.CHINA: Order.SourceType.CHINA_PREORDER,
+    Batch.Source.NIGERIA: Order.SourceType.NIGERIA_PREORDER,
+}
+
+
+def batch_is_open(batch):
+    return batch.status in (Batch.Status.ORDERING, Batch.Status.SHIPPED)
+
+
+def assignable_orders(batch):
+    """Paid preorders from the same source that are not in any batch yet."""
+    return (
+        Order.objects.active()
+        .filter(
+            batch__isnull=True,
+            source_type=ASSIGNABLE_SOURCE[batch.source],
+            stage__in=[Order.Stage.PAID, Order.Stage.PURCHASED],
+        )
+        .select_related("customer")
+    )
+
+
+@login_required
+def batch_list(request):
+    show_closed = request.GET.get("closed") == "1"
+    batches = Batch.objects.annotate(
+        order_count=Count("orders", filter=Q(orders__is_cancelled=False))
+    )
+    if show_closed:
+        batches = batches.filter(status=Batch.Status.CLOSED)
+    else:
+        batches = batches.exclude(status=Batch.Status.CLOSED)
+    return render(
+        request,
+        "orders/batch_list.html",
+        {"batches": batches, "show_closed": show_closed},
+    )
+
+
+@login_required
+def batch_create(request):
+    if request.method == "POST":
+        form = BatchForm(request.POST)
+        if form.is_valid():
+            batch = form.save()
+            return redirect("batch_detail", pk=batch.pk)
+    else:
+        form = BatchForm()
+    return render(request, "orders/batch_form.html", {"form": form})
+
+
+@login_required
+def batch_detail(request, pk):
+    batch = get_object_or_404(Batch, pk=pk)
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+
+        if action == "ship" and batch.status == Batch.Status.ORDERING:
+            moved = batch.mark_shipped()
+            messages.success(request, f"Batch shipped. {moved} orders moved to in transit.")
+
+        elif action == "arrive" and batch.status in (
+            Batch.Status.ORDERING,
+            Batch.Status.SHIPPED,
+        ):
+            moved = batch.mark_arrived()
+            messages.success(request, f"Batch arrived. {moved} orders moved to arrived.")
+
+        elif action == "close" and batch.status == Batch.Status.ARRIVED:
+            batch.status = Batch.Status.CLOSED
+            batch.save(update_fields=["status"])
+            return redirect("batch_list")
+
+        elif action == "add_orders" and batch_is_open(batch):
+            ids = list(
+                assignable_orders(batch)
+                .filter(pk__in=request.POST.getlist("order_ids"))
+                .values_list("pk", flat=True)
+            )
+            Order.objects.filter(pk__in=ids).update(batch=batch)
+            if batch.status == Batch.Status.SHIPPED:
+                Order.objects.filter(
+                    pk__in=ids,
+                    stage__in=[Order.Stage.PAID, Order.Stage.PURCHASED],
+                ).update(stage=Order.Stage.IN_TRANSIT)
+            messages.success(request, f"{len(ids)} orders added.")
+
+        elif action == "remove_order" and batch_is_open(batch):
+            Order.objects.filter(pk=request.POST.get("order_id"), batch=batch).update(
+                batch=None
+            )
+            messages.success(request, "Order removed from the batch.")
+
+        else:
+            messages.error(request, "That action isn't available for this batch.")
+        return redirect("batch_detail", pk=batch.pk)
+
+    orders = batch.orders.active().select_related("customer")
+    context = {
+        "batch": batch,
+        "orders": orders,
+        "total": orders.count(),
+        "shipping_due": orders.filter(stage=Order.Stage.ARRIVED).count(),
+        "delivered": orders.filter(stage=Order.Stage.DELIVERED).count(),
+        "next_action": BATCH_NEXT.get(batch.status),
+        "is_open": batch_is_open(batch),
+        "assignable": assignable_orders(batch) if batch_is_open(batch) else [],
+    }
+    return render(request, "orders/batch_detail.html", context)

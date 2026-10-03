@@ -1,0 +1,26 @@
+{% extends "orders/base.html" %}
+
+{% block title %}Batches{% endblock %}
+
+{% block content %}
+<nav class="chips">
+  <a class="chip {% if not show_closed %}on{% endif %}" href="{% url 'batch_list' %}">Open</a>
+  <a class="chip {% if show_closed %}on{% endif %}" href="?closed=1">Closed</a>
+</nav>
+
+{% for batch in batches %}
+  <a class="order" href="{% url 'batch_detail' batch.pk %}" style="color:inherit;text-decoration:none">
+    <div class="info">
+      <strong>{{ batch.label }}</strong>
+      <div class="muted">{{ batch.get_source_display }} · {{ batch.order_count }} order{{ batch.order_count|pluralize }}</div>
+    </div>
+    <div class="right">
+      <span class="badge {% if batch.status == 'shipped' %}s-in_transit{% elif batch.status == 'arrived' %}s-arrived{% endif %}">{{ batch.get_status_display }}</span>
+    </div>
+  </a>
+{% empty %}
+  <p class="muted">No batches here yet.</p>
+{% endfor %}
+
+<a class="primary fab" href="{% url 'batch_create' %}">+ New batch</a>
+{% endblock %}

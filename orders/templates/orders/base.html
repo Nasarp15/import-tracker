@@ -36,7 +36,7 @@
 </head>
 <body>
   <header>
-    <a href="{% url 'order_list' %}">Orders</a>
+        <div style="display:flex;gap:16px"><a href="{% url 'order_list' %}">Orders</a><a href="{% url 'batch_list' %}">Batches</a></div>
     {% if user.is_authenticated %}
     <form method="post" action="{% url 'logout' %}">
       {% csrf_token %}

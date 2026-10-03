@@ -100,8 +100,23 @@ class Batch(models.Model):
         ordering = ["-id"]
         verbose_name_plural = "batches"
 
+    def mark_shipped(self, shipped_on=None):
+        """Mark the batch shipped and move its paid or purchased orders to in transit.
+
+        Returns the number of orders updated.
+        """
+        with transaction.atomic():
+            self.status = self.Status.SHIPPED
+            self.shipped_on = shipped_on or timezone.localdate()
+            self.save(update_fields=["status", "shipped_on"])
+            return (
+                self.orders.active()
+                .filter(stage__in=[Order.Stage.PAID, Order.Stage.PURCHASED])
+                .update(stage=Order.Stage.IN_TRANSIT)
+            )
+
     def mark_arrived(self, arrived_on=None):
-        """Mark the batch arrived and move all its in-transit orders with it.
+        """Mark the batch arrived and move all its paid, purchased or in-transit orders.
 
         Returns the number of orders updated.
         """
@@ -111,7 +126,13 @@ class Batch(models.Model):
             self.save(update_fields=["status", "arrived_on"])
             return (
                 self.orders.active()
-                .filter(stage__in=[Order.Stage.PURCHASED, Order.Stage.IN_TRANSIT])
+                .filter(
+                    stage__in=[
+                        Order.Stage.PAID,
+                        Order.Stage.PURCHASED,
+                        Order.Stage.IN_TRANSIT,
+                    ]
+                )
                 .update(stage=Order.Stage.ARRIVED)
             )
 

@@ -141,3 +141,13 @@ class QuoteForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["quoted_price"].required = True
+
+
+class BatchForm(forms.ModelForm):
+    class Meta:
+        model = Batch
+        fields = ["source", "label"]
+        labels = {
+            "source": "Where is it coming from?",
+            "label": "Batch name (for example: China batch, 2 Sept)",
+        }
