@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from .forms import OrderForm, PaymentForm, QuoteForm, ShippingForm
 from .models import Order, Payment
+from .whatsapp import arrival_link, confirmation_link
 
 STAGE_CHIPS = [
     ("", "All"),
@@ -187,6 +188,17 @@ def order_detail(request, pk):
         "next_step": next_step(order),
         "suggested_fee": order.suggested_shipping_fee() if order.size_band else None,
         "can_add_payment": can_add_payment,
+        "confirmation_link": (
+            confirmation_link(order, bal)
+            if order.quoted_price and order.stage != Order.Stage.DELIVERED
+            else None
+        ),
+        "arrival_link": (
+            arrival_link(order, bal)
+            if order.shipping_fee is not None
+            and order.stage in (Order.Stage.ARRIVED, Order.Stage.SHIPPING_PAID)
+            else None
+        ),
         "payment_form": payment_form,
         "shipping_form": shipping_form,
         "quote_form": quote_form,

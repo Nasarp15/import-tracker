@@ -16,6 +16,7 @@
   .msg.warning, .msg.error { background: #fdecc8; color: #7a4b00; }
   .pay { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; color: #55554f; }
   .secondary { background: #fff; color: #b3261e; border: 1px solid #e3b5b1; margin-top: 8px; }
+  .wa { margin-bottom: 8px; }
   .hint { font-size: 13px; color: #1d4d8f; margin: -6px 0 12px; }
 </style>
 
@@ -60,6 +61,14 @@
     <input type="hidden" name="stage" value="{{ next_step.0 }}">
     <button type="submit">{{ next_step.1 }}</button>
   </form>
+{% endif %}
+
+{% if confirmation_link or arrival_link %}
+  <div class="card">
+    <h2>Message the customer</h2>
+    {% if confirmation_link %}<a class="primary wa" href="{{ confirmation_link }}" target="_blank" rel="noopener">Send order confirmation</a>{% endif %}
+    {% if arrival_link %}<a class="primary wa" href="{{ arrival_link }}" target="_blank" rel="noopener">Send arrival notice</a>{% endif %}
+  </div>
 {% endif %}
 
 {% if order.stage == "requested" or order.stage == "quoted" %}
