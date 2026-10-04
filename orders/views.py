@@ -1,11 +1,22 @@
+from decimal import Decimal
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from .forms import BatchForm, OrderForm, PaymentForm, QuoteForm, ShippingForm
+from .forms import (
+    BatchBillForm,
+    BatchForm,
+    BatchRateForm,
+    OrderForm,
+    PaymentForm,
+    QuoteForm,
+    ShippingForm,
+)
 from .models import Batch, Order, Payment
+from .shipping import split_bill, target_total
 from .whatsapp import arrival_link, confirmation_link
 
 STAGE_CHIPS = [
@@ -98,7 +109,7 @@ def order_create(request):
 def order_detail(request, pk):
     order = get_object_or_404(
         Order.objects.active()
-        .select_related("customer", "address", "batch", "size_band")
+        .select_related("customer", "address", "batch")
         .prefetch_related("photos", "payments"),
         pk=pk,
     )
@@ -146,18 +157,9 @@ def order_detail(request, pk):
             if order.stage != Order.Stage.ARRIVED:
                 messages.error(request, "Shipping can only be set once the item has arrived.")
                 return redirect("order_detail", pk=order.pk)
-            old_fee = order.shipping_fee
             shipping_form = ShippingForm(request.POST, instance=fresh())
             if shipping_form.is_valid():
-                updated = shipping_form.save(commit=False)
-                if updated.shipping_fee is None:
-                    updated.shipping_fee = updated.suggested_shipping_fee() or old_fee
-                    if updated.shipping_fee is None:
-                        messages.warning(
-                            request,
-                            "No grid rule matches this size and cost. Enter the fee yourself.",
-                        )
-                updated.save()
+                updated = shipping_form.save()
                 updated.refresh_stage_from_payments()
                 return redirect("order_detail", pk=order.pk)
 
@@ -186,7 +188,6 @@ def order_detail(request, pk):
         "order": order,
         "payments": order.payments.all(),
         "next_step": next_step(order),
-        "suggested_fee": order.suggested_shipping_fee() if order.size_band else None,
         "can_add_payment": can_add_payment,
         "confirmation_link": (
             confirmation_link(order, bal)
@@ -304,6 +305,14 @@ def batch_detail(request, pk):
                 ).update(stage=Order.Stage.IN_TRANSIT)
             messages.success(request, f"{len(ids)} orders added.")
 
+        elif action == "set_rate" and batch.status != Batch.Status.CLOSED:
+            rate_form = BatchRateForm(request.POST, instance=batch)
+            if rate_form.is_valid():
+                rate_form.save()
+                messages.success(request, "Exchange rate saved.")
+            else:
+                messages.error(request, "Enter an exchange rate greater than zero.")
+
         elif action == "remove_order" and batch_is_open(batch):
             Order.objects.filter(pk=request.POST.get("order_id"), batch=batch).update(
                 batch=None
@@ -323,6 +332,79 @@ def batch_detail(request, pk):
         "delivered": orders.filter(stage=Order.Stage.DELIVERED).count(),
         "next_action": BATCH_NEXT.get(batch.status),
         "is_open": batch_is_open(batch),
+        "rate_form": BatchRateForm(instance=batch),
         "assignable": assignable_orders(batch) if batch_is_open(batch) else [],
     }
     return render(request, "orders/batch_detail.html", context)
+
+
+@login_required
+def batch_split(request, pk):
+    batch = get_object_or_404(Batch, pk=pk)
+    orders = list(
+        batch.orders.active().select_related("customer", "batch").prefetch_related("payments")
+    )
+    arrived = [o for o in orders if o.stage == Order.Stage.ARRIVED]
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+
+        if batch.status != Batch.Status.ARRIVED:
+            messages.error(request, "The bill can only be split once the batch has arrived.")
+
+        elif action == "set_bill":
+            form = BatchBillForm(request.POST, instance=batch)
+            if form.is_valid():
+                form.save()
+                messages.success(request, "Bill saved.")
+            else:
+                messages.error(request, "Enter the agent's bill as an amount greater than zero.")
+
+        elif action == "apply":
+            target = target_total(batch)
+            if target is None:
+                messages.error(request, "Enter the agent's bill first.")
+            elif any(o.paid_total(Payment.Kind.SHIPPING) > 0 for o in arrived):
+                messages.error(
+                    request,
+                    "Some customers have already paid shipping. Change individual fees on their order pages instead.",
+                )
+            else:
+                shares, missing = split_bill(arrived, target)
+                if not shares:
+                    messages.error(
+                        request,
+                        "No order has a cost in cedis yet. Enter each order's cost, and the batch exchange rate for costs in yuan or naira.",
+                    )
+                else:
+                    for order in arrived:
+                        if order.pk in shares:
+                            order.shipping_fee = shares[order.pk]
+                            order.save(update_fields=["shipping_fee"])
+                    text = f"Fees applied to {len(shares)} orders."
+                    if missing:
+                        text += f" {len(missing)} orders have no cost in cedis and were left out."
+                    messages.success(request, text)
+
+        else:
+            messages.error(request, "That action isn't available.")
+        return redirect("batch_split", pk=batch.pk)
+
+    target = target_total(batch)
+    shares, missing = split_bill(arrived, target) if target else ({}, [])
+    rows = [
+        {"order": o, "cost": o.cost_in_grid_currency, "share": shares.get(o.pk)}
+        for o in arrived
+    ]
+    fees_set = sum((o.shipping_fee for o in orders if o.shipping_fee is not None), Decimal("0"))
+    context = {
+        "batch": batch,
+        "rows": rows,
+        "bill_form": BatchBillForm(instance=batch),
+        "target": target,
+        "fees_set": fees_set,
+        "difference": (target - fees_set) if target else None,
+        "needs_cost": len(missing),
+        "can_edit": batch.status == Batch.Status.ARRIVED,
+    }
+    return render(request, "orders/batch_split.html", context)

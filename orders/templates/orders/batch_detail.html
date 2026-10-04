@@ -34,8 +34,21 @@
   <div class="muted">{{ batch.get_source_display }}</div>
   {% if batch.shipped_on %}<div class="muted">Shipped {{ batch.shipped_on|date:"j M Y" }}</div>{% endif %}
   {% if batch.arrived_on %}<div class="muted">Arrived {{ batch.arrived_on|date:"j M Y" }}</div>{% endif %}
-  <div class="muted">{{ total }} order{{ total|pluralize }} · {{ shipping_due }} shipping due · {{ delivered }} delivered</div>
+  <div class="muted">{{ total }} order{{ total|pluralize }} · {{ shipping_due }} shipping due · {{ delivered }} delivered </div>
+{% if batch.status == "arrived" %}<p><a href="{% url 'batch_split' batch.pk %}">Split the shipping bill &rarr;</a></p>{% endif %}
 </div>
+
+{% if batch.status != "closed" %}
+  <div class="card">
+    <h2>Exchange rate</h2>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="set_rate">
+      {% include "orders/_fields.html" with form=rate_form %}
+      <button type="submit">Save rate</button>
+    </form>
+  </div>
+{% endif %}
 
 {% if next_action %}
   <form method="post">

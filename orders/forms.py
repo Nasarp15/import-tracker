@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django import forms
 
 from .models import (
@@ -42,17 +44,27 @@ class OrderForm(forms.ModelForm):
         "quantity",
         "quoted_price",
         "cost",
+        "cost_currency",
     ]
 
     class Meta:
         model = Order
-        fields = ["source_type", "batch", "item_notes", "quantity", "quoted_price", "cost"]
+        fields = [
+            "source_type",
+            "batch",
+            "item_notes",
+            "quantity",
+            "quoted_price",
+            "cost",
+            "cost_currency",
+        ]
         labels = {
             "source_type": "Source",
             "item_notes": "Item notes (colour, variant, size)",
             "quantity": "Quantity",
             "quoted_price": "Quoted price (total, GHS)",
-            "cost": "My cost (private, GHS)",
+            "cost": "My cost (private)",
+            "cost_currency": "Cost currency",
         }
         widgets = {
             "item_notes": forms.Textarea(attrs={"rows": 2}),
@@ -114,29 +126,29 @@ class PaymentForm(forms.ModelForm):
 class ShippingForm(forms.ModelForm):
     class Meta:
         model = Order
-        fields = ["size_band", "shipping_fee"]
-        labels = {
-            "size_band": "Item size",
-            "shipping_fee": "Shipping fee (leave empty to use the grid)",
-        }
+        fields = ["shipping_fee"]
+        labels = {"shipping_fee": "Shipping fee (GHS)"}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.initial.pop("shipping_fee", None)
-        self.fields["size_band"].empty_label = "Choose size"
+        self.fields["shipping_fee"].required = True
 
-    def clean(self):
-        cleaned = super().clean()
-        if not cleaned.get("size_band") and cleaned.get("shipping_fee") is None:
-            raise forms.ValidationError("Choose the item size or enter a fee.")
-        return cleaned
+    def clean_shipping_fee(self):
+        fee = self.cleaned_data["shipping_fee"]
+        if fee is None or fee < 0:
+            raise forms.ValidationError("Enter the shipping fee as a number.")
+        return fee
 
 
 class QuoteForm(forms.ModelForm):
     class Meta:
         model = Order
-        fields = ["quoted_price", "cost"]
-        labels = {"quoted_price": "Quoted price (total)", "cost": "My cost (private)"}
+        fields = ["quoted_price", "cost", "cost_currency"]
+        labels = {
+            "quoted_price": "Quoted price (total)",
+            "cost": "My cost (private)",
+            "cost_currency": "Cost currency",
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -151,3 +163,56 @@ class BatchForm(forms.ModelForm):
             "source": "Where is it coming from?",
             "label": "Batch name (for example: China batch, 2 Sept)",
         }
+
+
+class BatchRateForm(forms.ModelForm):
+    class Meta:
+        model = Batch
+        fields = ["exchange_rate"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        field = self.fields["exchange_rate"]
+        field.required = True
+        field.help_text = ""
+        if self.instance.source == Batch.Source.CHINA:
+            field.label = "Exchange rate (yuan per 1 cedi)"
+        else:
+            field.label = "Exchange rate (naira per 1 cedi)"
+
+    def clean_exchange_rate(self):
+        rate = self.cleaned_data["exchange_rate"]
+        if rate is None or rate <= 0:
+            raise forms.ValidationError("Enter a rate greater than zero.")
+        return rate
+
+
+class BatchBillForm(forms.ModelForm):
+    class Meta:
+        model = Batch
+        fields = ["freight_total", "freight_margin_percent"]
+        labels = {
+            "freight_total": "Agent's bill for this batch (GHS)",
+            "freight_margin_percent": "Extra on top, % (optional)",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["freight_total"].required = True
+        self.fields["freight_total"].help_text = ""
+        self.fields["freight_margin_percent"].required = False
+        self.fields["freight_margin_percent"].help_text = ""
+
+    def clean_freight_total(self):
+        total = self.cleaned_data["freight_total"]
+        if total is None or total <= 0:
+            raise forms.ValidationError("Enter an amount greater than zero.")
+        return total
+
+    def clean_freight_margin_percent(self):
+        margin = self.cleaned_data.get("freight_margin_percent")
+        if margin is None:
+            return Decimal("0")
+        if margin < 0 or margin > 100:
+            raise forms.ValidationError("Enter a percentage between 0 and 100.")
+        return margin

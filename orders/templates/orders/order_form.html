@@ -5,7 +5,7 @@
 {% block content %}
 <h1>New order</h1>
 
-<form method="post" enctype="multipart/form-data">
+<form method="post" enctype="multipart/form-data" id="order-form" data-bound="{{ form.is_bound|yesno:'1,0' }}">
   {% csrf_token %}
   {{ form.non_field_errors }}
   {% for field in form %}
@@ -18,4 +18,20 @@
   <button type="submit">Save order</button>
   <a class="cancel" href="{% url 'order_list' %}">Cancel</a>
 </form>
+
+<script>
+  var orderForm = document.getElementById("order-form");
+  var source = document.getElementById("id_source_type");
+  var costCurrency = document.getElementById("id_cost_currency");
+
+  function syncCostCurrency() {
+    costCurrency.value = source.value === "china_preorder" ? "CNY" : "NGN";  }
+
+  if (source && costCurrency) {
+    source.addEventListener("change", syncCostCurrency);
+    if (orderForm.dataset.bound === "0") {
+      syncCostCurrency();
+    }
+  }
+</script>
 {% endblock %}

@@ -9,4 +9,5 @@ urlpatterns = [
     path("batches/", views.batch_list, name="batch_list"),
     path("batches/new/", views.batch_create, name="batch_create"),
     path("batches/<int:pk>/", views.batch_detail, name="batch_detail"),
+    path("batches/<int:pk>/split/", views.batch_split, name="batch_split"),
 ]

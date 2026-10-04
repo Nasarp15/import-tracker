@@ -51,8 +51,7 @@
     <div class="kv"><span>Shipping paid</span><span>{{ order.currency }} {{ shipping_paid|floatformat:"-2" }}</span></div>
     {% if shipping_balance %}<div class="kv"><span>Shipping balance</span><span>{{ order.currency }} {{ shipping_balance|floatformat:"-2" }}</span></div>{% endif %}
   {% endif %}
-  {% if order.cost %}<div class="kv"><span>My cost (private)</span><span>{{ order.cost_currency }} {{ order.cost|floatformat:"-2" }}</span></div>{% endif %}
-</div>
+  {% if order.cost %}<div class="kv"><span>My cost (private)</span><span>{{ order.cost_currency }} {{ order.cost|floatformat:"-2" }}{% if order.cost_currency != "GHS" %}{% if order.cost_in_grid_currency %} (GHS {{ order.cost_in_grid_currency|floatformat:"-2" }}){% else %} (set batch rate){% endif %}{% endif %}</span></div>{% endif %}</div>
 
 {% if next_step %}
   <form method="post">

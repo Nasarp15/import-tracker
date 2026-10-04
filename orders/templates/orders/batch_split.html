@@ -1,0 +1,84 @@
+{% extends "orders/base.html" %}
+
+{% block title %}Split the bill{% endblock %}
+
+{% block content %}
+<style>
+  .back { color: #55554f; text-decoration: none; font-size: 14px; }
+  .card { background: #fff; border: 1px solid #e3e3df; border-radius: 12px; padding: 14px; margin: 12px 0; }
+  .card h2 { font-size: 15px; margin: 0 0 10px; }
+  .msg { padding: 10px 12px; border-radius: 8px; margin: 12px 0; font-size: 14px; background: #d9f0e0; color: #1d6b3a; }
+  .msg.error { background: #fdecc8; color: #7a4b00; }
+  .kv { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; }
+  .kv span:first-child { color: #6b6b66; }
+  .srow { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eeeeea; }
+  .sinfo { flex: 1; min-width: 0; }
+  .sshare { text-align: right; flex: none; font-weight: 600; font-size: 15px; }
+  .gap { margin-top: 12px; }
+  .ok { color: #1d6b3a; }
+  .warn { color: #7a4b00; }
+</style>
+
+<p><a class="back" href="{% url 'batch_detail' batch.pk %}">&larr; {{ batch.label }}</a></p>
+
+<h1>Split the shipping bill</h1>
+
+{% for message in messages %}
+  <div class="msg {{ message.tags }}">{{ message }}</div>
+{% endfor %}
+
+{% if not can_edit %}
+  <p class="muted">This batch has to be marked as arrived before the bill can be split.</p>
+{% else %}
+
+<div class="card">
+  <h2>1. The agent's bill</h2>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="set_bill">
+    {% include "orders/_fields.html" with form=bill_form %}
+    <button type="submit">Save bill</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>2. Each customer's share</h2>
+  <p class="muted">A more expensive item carries a bigger share of the bill.</p>
+  {% for row in rows %}
+    <div class="srow">
+      <div class="sinfo">
+        <strong>{{ row.order.customer.name|default:row.order.customer.phone }}</strong>
+        <div class="muted">{{ row.order.item_notes|truncatechars:30|default:"No notes" }} · cost {% if row.cost %}GHS {{ row.cost|floatformat:"-2" }}{% else %}<span class="warn">needs a cost or exchange rate</span>{% endif %}</div>
+        {% if row.order.shipping_fee is not None %}<div class="muted">Fee set: GHS {{ row.order.shipping_fee|floatformat:"-2" }}</div>{% endif %}
+      </div>
+      <div class="sshare">
+        {% if row.share is not None %}GHS {{ row.share|floatformat:"-2" }}{% elif target %}<span class="warn">no share</span>{% else %}&ndash;{% endif %}
+      </div>
+    </div>
+  {% empty %}
+    <p class="muted">No arrived orders are waiting for a shipping fee.</p>
+  {% endfor %}
+  {% if not target and rows %}<p class="muted">Shares show once the bill is saved.</p>{% endif %}
+</div>
+
+<div class="card">
+  <h2>3. Check and apply</h2>
+  {% if target %}
+    <div class="kv"><span>Total to collect</span><span>GHS {{ target|floatformat:"-2" }}</span></div>
+    <div class="kv"><span>Fees set on orders</span><span>GHS {{ fees_set|floatformat:"-2" }}</span></div>
+    <div class="kv"><span>Still to assign</span><span class="{% if difference == 0 %}ok{% else %}warn{% endif %}">GHS {{ difference|floatformat:"-2" }}</span></div>
+    {% if needs_cost %}<p class="muted warn">{{ needs_cost }} order{{ needs_cost|pluralize }} have no cost in cedis and get no share.</p>{% endif %}
+  {% else %}
+    <p class="muted">Save the agent's bill to see the total.</p>
+  {% endif %}
+  {% if rows %}
+    <form method="post" class="gap" onsubmit="return confirm('Set the shipping fee on these orders?');">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="apply">
+      <button type="submit">Apply fees to all orders</button>
+    </form>
+  {% endif %}
+</div>
+
+{% endif %}
+{% endblock %}

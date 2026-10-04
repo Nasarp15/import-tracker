@@ -4,8 +4,7 @@ from django.db import models, transaction
 from django.db.models import Q, Sum
 from django.utils import timezone
 
-# The shipping grid is defined in this currency. Order costs are converted to it
-# (using the exchange rate saved on the order) before the grid lookup.
+# Order costs are converted to this currency (cedis) using the exchange rate.
 GRID_CURRENCY = "GHS"
 
 
@@ -90,10 +89,28 @@ class Batch(models.Model):
     shipped_on = models.DateField(null=True, blank=True)
     arrived_on = models.DateField(null=True, blank=True)
     freight_total = models.DecimalField(
-        max_digits=12, decimal_places=2, null=True, blank=True
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="What the shipping agent charged for this batch, in cedis.",
     )
     freight_currency = models.CharField(
         max_length=3, choices=Currency.choices, default=Currency.GHS
+    )
+    freight_margin_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        blank=True,
+        help_text="Optional extra added on top of the agent's bill when splitting it.",
+    )
+    exchange_rate = models.DecimalField(
+        max_digits=12,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Units of the cost currency per 1 cedi (China batches: yuan per 1 cedi, Nigeria batches: naira per 1 cedi). Used for every order in the batch.",
     )
 
     class Meta:
@@ -243,7 +260,7 @@ class Order(models.Model):
         decimal_places=6,
         null=True,
         blank=True,
-        help_text="Multiply cost by this to get cedis. Saved so later rate changes don't alter history.",
+        help_text="Optional override: units of the cost currency per 1 cedi. Leave empty to use the batch's exchange rate.",
     )
 
     size_band = models.ForeignKey(
@@ -267,13 +284,24 @@ class Order(models.Model):
         indexes = [models.Index(fields=["stage"])]
 
     @property
+    def effective_rate(self):
+        """The order's own rate if set, otherwise the batch's rate."""
+        if self.exchange_rate:
+            return self.exchange_rate
+        if self.batch_id and self.batch.exchange_rate:
+            return self.batch.exchange_rate
+        return None
+
+    @property
     def cost_in_grid_currency(self):
         if self.cost is None:
             return None
         if self.cost_currency == GRID_CURRENCY:
             return self.cost
-        if self.exchange_rate:
-            return (self.cost * self.exchange_rate).quantize(Decimal("0.01"))
+        rate = self.effective_rate
+        if rate:
+            # The rate is "cost currency per 1 cedi", so divide to get cedis.
+            return (self.cost / rate).quantize(Decimal("0.01"))
         return None
 
     def suggested_shipping_fee(self):
