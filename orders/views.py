@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -16,8 +17,15 @@ from .forms import (
     ShippingForm,
 )
 from .models import Batch, Order, Payment
+from .grouping import allocate_payment, customer_groups, group_totals
+from .profit import batch_profit
 from .shipping import split_bill, target_total
-from .whatsapp import arrival_link, confirmation_link
+from .whatsapp import (
+    arrival_link,
+    confirmation_link,
+    group_arrival_link,
+    group_confirmation_link,
+)
 
 STAGE_CHIPS = [
     ("", "All"),
@@ -323,10 +331,17 @@ def batch_detail(request, pk):
             messages.error(request, "That action isn't available for this batch.")
         return redirect("batch_detail", pk=batch.pk)
 
-    orders = batch.orders.active().select_related("customer")
+    orders = batch.orders.active().select_related("customer", "batch").prefetch_related("payments")
+    order_list = list(orders)
     context = {
         "batch": batch,
         "orders": orders,
+        "groups": customer_groups(order_list),
+        "profit": (
+            batch_profit(batch, order_list)
+            if batch.status != Batch.Status.ORDERING
+            else None
+        ),
         "total": orders.count(),
         "shipping_due": orders.filter(stage=Order.Stage.ARRIVED).count(),
         "delivered": orders.filter(stage=Order.Stage.DELIVERED).count(),
@@ -408,3 +423,68 @@ def batch_split(request, pk):
         "can_edit": batch.status == Batch.Status.ARRIVED,
     }
     return render(request, "orders/batch_split.html", context)
+
+
+@login_required
+def batch_customer(request, pk, customer_pk):
+    """All of one customer's items in one batch, with combined messages and payments."""
+    batch = get_object_or_404(Batch, pk=pk)
+    orders = list(
+        batch.orders.active()
+        .filter(customer_id=customer_pk)
+        .select_related("customer", "address", "batch")
+        .prefetch_related("payments")
+        .order_by("created_at")
+    )
+    if not orders:
+        raise Http404("No orders for this customer in this batch.")
+    customer = orders[0].customer
+    totals = group_totals(orders)
+
+    initial = {}
+    if totals["shipping_balance"] > 0:
+        initial = {"kind": Payment.Kind.SHIPPING, "amount": totals["shipping_balance"]}
+    elif totals["item_balance"] > 0:
+        initial = {"kind": Payment.Kind.ITEM, "amount": totals["item_balance"]}
+    form = PaymentForm(initial=initial)
+
+    if request.method == "POST" and request.POST.get("action") == "record_payment":
+        form = PaymentForm(request.POST)
+        if form.is_valid():
+            try:
+                created = allocate_payment(
+                    orders,
+                    form.cleaned_data["kind"],
+                    form.cleaned_data["amount"],
+                    form.cleaned_data["method"],
+                )
+            except ValueError as error:
+                form.add_error("amount", str(error))
+            else:
+                messages.success(
+                    request, f"Payment recorded across {len(created)} item(s)."
+                )
+                return redirect("batch_customer", pk=batch.pk, customer_pk=customer.pk)
+
+    priced = [
+        o for o in orders if o.quoted_price and o.stage != Order.Stage.DELIVERED
+    ]
+    arrived = [
+        o
+        for o in orders
+        if o.shipping_fee is not None
+        and o.stage in (Order.Stage.ARRIVED, Order.Stage.SHIPPING_PAID)
+    ]
+    context = {
+        "batch": batch,
+        "customer": customer,
+        "orders": orders,
+        "totals": totals,
+        "form": form,
+        "can_pay": totals["item_balance"] > 0 or totals["shipping_balance"] > 0,
+        "confirmation_link": (
+            group_confirmation_link(batch, customer, orders) if priced else None
+        ),
+        "arrival_link": group_arrival_link(batch, customer, orders) if arrived else None,
+    }
+    return render(request, "orders/batch_customer.html", context)

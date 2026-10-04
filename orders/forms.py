@@ -122,6 +122,12 @@ class PaymentForm(forms.ModelForm):
         fields = ["kind", "amount", "method"]
         labels = {"kind": "Payment for", "amount": "Amount", "method": "Paid by"}
 
+    def clean_amount(self):
+        amount = self.cleaned_data["amount"]
+        if amount is None or amount <= 0:
+            raise forms.ValidationError("Enter an amount greater than zero.")
+        return amount
+
 
 class ShippingForm(forms.ModelForm):
     class Meta:

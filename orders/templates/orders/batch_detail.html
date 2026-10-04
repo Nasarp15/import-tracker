@@ -11,8 +11,18 @@
   .top h1 { margin: 0; font-size: 18px; }
   .msg { padding: 10px 12px; border-radius: 8px; margin: 12px 0; font-size: 14px; background: #d9f0e0; color: #1d6b3a; }
   .msg.error { background: #fdecc8; color: #7a4b00; }
-  .brow { display: flex; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #eeeeea; }
-  .brow a { flex: 1; min-width: 0; color: inherit; text-decoration: none; }
+  .kv { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; }
+  .kv span:first-child { color: #6b6b66; }
+  .kv.total { border-top: 1px solid #e3e3df; margin-top: 6px; padding-top: 10px; font-weight: 600; }
+  .kv.total span:first-child { color: inherit; }
+  .ok { color: #1d6b3a; }
+  .warn { color: #7a4b00; }
+  .group { border-bottom: 1px solid #e3e3df; padding: 6px 0 10px; }
+  .group:last-child { border-bottom: 0; }
+  .ghead { display: flex; justify-content: space-between; gap: 8px; color: inherit; text-decoration: none; padding: 6px 0; }
+  .gright { text-align: right; font-size: 14px; }
+  .brow { display: flex; gap: 8px; align-items: center; padding: 6px 0 6px 12px; border-left: 3px solid #e3e3df; margin: 4px 0; }
+  .brow a { flex: 1; min-width: 0; color: inherit; text-decoration: none; font-size: 14px; }
   .brow form { margin: 0; }
   .rm { display: inline-block; width: auto; padding: 2px 8px; font-size: 12px; background: #fff; color: #b3261e; border: 1px solid #e3b5b1; }
   .check { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid #eeeeea; font-size: 14px; }
@@ -34,8 +44,8 @@
   <div class="muted">{{ batch.get_source_display }}</div>
   {% if batch.shipped_on %}<div class="muted">Shipped {{ batch.shipped_on|date:"j M Y" }}</div>{% endif %}
   {% if batch.arrived_on %}<div class="muted">Arrived {{ batch.arrived_on|date:"j M Y" }}</div>{% endif %}
-  <div class="muted">{{ total }} order{{ total|pluralize }} · {{ shipping_due }} shipping due · {{ delivered }} delivered </div>
-{% if batch.status == "arrived" %}<p><a href="{% url 'batch_split' batch.pk %}">Split the shipping bill &rarr;</a></p>{% endif %}
+  <div class="muted">{{ total }} order{{ total|pluralize }} · {{ shipping_due }} shipping due · {{ delivered }} delivered</div>
+  {% if batch.status == "arrived" %}<p><a href="{% url 'batch_split' batch.pk %}">Split the shipping bill &rarr;</a></p>{% endif %}
 </div>
 
 {% if batch.status != "closed" %}
@@ -58,23 +68,56 @@
   </form>
 {% endif %}
 
+{% if profit %}
+  <div class="card">
+    <h2>Profit</h2>
+    <div class="kv"><span>Sales (selling prices)</span><span>GHS {{ profit.sales|floatformat:"-2" }}</span></div>
+    <div class="kv"><span>Item cost</span><span>GHS {{ profit.cost|floatformat:"-2" }}</span></div>
+    <div class="kv"><span>Item profit</span><span class="{% if profit.item_profit < 0 %}warn{% else %}ok{% endif %}">GHS {{ profit.item_profit|floatformat:"-2" }}</span></div>
+    {% if profit.shipping_result is not None %}
+      <div class="kv"><span>Shipping fees set</span><span>GHS {{ profit.fees_set|floatformat:"-2" }}</span></div>
+      <div class="kv"><span>Agent's bill</span><span>GHS {{ profit.bill|floatformat:"-2" }}</span></div>
+      <div class="kv"><span>Shipping result</span><span class="{% if profit.shipping_result < 0 %}warn{% else %}ok{% endif %}">GHS {{ profit.shipping_result|floatformat:"-2" }}</span></div>
+    {% else %}
+      <p class="muted">The shipping result shows once the agent's bill is entered (Split the shipping bill).</p>
+    {% endif %}
+    <div class="kv total"><span>{% if profit.shipping_result is None %}Profit so far (before shipping){% else %}Total profit{% endif %}</span><span class="{% if profit.total < 0 %}warn{% else %}ok{% endif %}">GHS {{ profit.total|floatformat:"-2" }}</span></div>
+    {% if profit.skipped %}
+      <p class="muted warn">{{ profit.skipped }} order{{ profit.skipped|pluralize }} left out: no selling price, or no cost in cedis (check the exchange rate).</p>
+    {% endif %}
+  </div>
+{% endif %}
+
 <div class="card">
-  <h2>Orders in this batch</h2>
-  {% for order in orders %}
-    <div class="brow">
-      <a href="{% url 'order_detail' order.pk %}">
-        <strong>{{ order.customer.name|default:order.customer.phone }}</strong>
-        <div class="muted">{{ order.item_notes|truncatechars:40|default:"No notes" }}</div>
+  <h2>Customers in this batch</h2>
+  {% for group in groups %}
+    <div class="group">
+      <a class="ghead" href="{% url 'batch_customer' batch.pk group.customer.pk %}">
+        <div>
+          <strong>{{ group.customer.name|default:group.customer.phone }}</strong>
+          <div class="muted">{{ group.customer.phone }} · {{ group.orders|length }} item{{ group.orders|length|pluralize }}</div>
+        </div>
+        <div class="gright">
+          {% if group.item_total %}<div>GHS {{ group.item_total|floatformat:"-2" }}</div>{% endif %}
+          {% if group.shipping_total %}<div class="muted">Shipping GHS {{ group.shipping_total|floatformat:"-2" }}</div>{% endif %}
+        </div>
       </a>
-      <span class="badge s-{{ order.stage }}">{{ order.get_stage_display }}</span>
-      {% if is_open %}
-        <form method="post">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="remove_order">
-          <input type="hidden" name="order_id" value="{{ order.pk }}">
-          <button class="rm" type="submit">Remove</button>
-        </form>
-      {% endif %}
+      {% for order in group.orders %}
+        <div class="brow">
+          <a href="{% url 'order_detail' order.pk %}">
+            {{ order.item_notes|truncatechars:40|default:"No notes" }}
+          </a>
+          <span class="badge s-{{ order.stage }}">{{ order.get_stage_display }}</span>
+          {% if is_open %}
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="remove_order">
+              <input type="hidden" name="order_id" value="{{ order.pk }}">
+              <button class="rm" type="submit">Remove</button>
+            </form>
+          {% endif %}
+        </div>
+      {% endfor %}
     </div>
   {% empty %}
     <p class="muted">No orders in this batch yet.</p>
