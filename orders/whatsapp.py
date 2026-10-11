@@ -182,3 +182,15 @@ def group_confirmation_link(batch, customer, orders):
 
 def group_arrival_link(batch, customer, orders):
     return _link_to(customer.phone, group_arrival_message(batch, customer, orders))
+
+
+def stock_order_link(number, item):
+    """WhatsApp link a customer taps to ask about a stock item. None if no number is set."""
+    digits = "".join(ch for ch in (number or "") if ch.isdigit())
+    if not digits:
+        return None
+    text = (
+        f"Hello, I would like to order: {item.name} (GHS {money(item.price)}). "
+        "Is it still available?"
+    )
+    return f"https://wa.me/{digits}?text={quote(text, safe='')}"

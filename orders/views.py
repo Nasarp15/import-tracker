@@ -1,8 +1,9 @@
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Q
+from django.db.models import Count, F, Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -15,8 +16,9 @@ from .forms import (
     PaymentForm,
     QuoteForm,
     ShippingForm,
+    StockItemForm,
 )
-from .models import Batch, Order, Payment
+from .models import Batch, Order, Payment, StockItem
 from .grouping import allocate_payment, customer_groups, group_totals
 from .profit import batch_profit
 from .shipping import split_bill, target_total
@@ -25,6 +27,7 @@ from .whatsapp import (
     confirmation_link,
     group_arrival_link,
     group_confirmation_link,
+    stock_order_link,
 )
 
 STAGE_CHIPS = [
@@ -187,6 +190,10 @@ def order_detail(request, pk):
         elif action == "cancel":
             order.is_cancelled = True
             order.save(update_fields=["is_cancelled"])
+            if order.stock_item_id:
+                StockItem.objects.filter(pk=order.stock_item_id).update(
+                    quantity=F("quantity") + order.quantity
+                )
             return redirect("order_list")
 
         bal = balances(order)
@@ -488,3 +495,49 @@ def batch_customer(request, pk, customer_pk):
         "arrival_link": group_arrival_link(batch, customer, orders) if arrived else None,
     }
     return render(request, "orders/batch_customer.html", context)
+
+
+# ------------------------------------------------------------------ stock
+
+
+@login_required
+def stock_list(request):
+    return render(request, "orders/stock_list.html", {"items": StockItem.objects.all()})
+
+
+@login_required
+def stock_create(request):
+    if request.method == "POST":
+        form = StockItemForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            return redirect("stock_list")
+    else:
+        form = StockItemForm()
+    return render(request, "orders/stock_form.html", {"form": form, "item": None})
+
+
+@login_required
+def stock_edit(request, pk):
+    item = get_object_or_404(StockItem, pk=pk)
+    if request.method == "POST":
+        form = StockItemForm(request.POST, request.FILES, instance=item)
+        if form.is_valid():
+            form.save()
+            return redirect("stock_list")
+    else:
+        form = StockItemForm(instance=item)
+    return render(request, "orders/stock_form.html", {"form": form, "item": item})
+
+
+def shop(request):
+    """Public page: no login. Shows only visible items that are still in stock."""
+    number = getattr(settings, "BUSINESS_WHATSAPP", "")
+    items = StockItem.objects.filter(is_visible=True, quantity__gt=0)
+    rows = [{"item": item, "link": stock_order_link(number, item)} for item in items]
+    context = {
+        "rows": rows,
+        "business_name": getattr(settings, "BUSINESS_NAME", "Our shop"),
+        "has_number": bool("".join(ch for ch in number if ch.isdigit())),
+    }
+    return render(request, "orders/shop.html", context)

@@ -142,3 +142,6 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+
+BUSINESS_NAME = os.environ.get("BUSINESS_NAME", "Our shop")
+BUSINESS_WHATSAPP = os.environ.get("BUSINESS_WHATSAPP", "")

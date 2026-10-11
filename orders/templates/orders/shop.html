@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ business_name }}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f5f5f3; color: #1c1c1a; }
+    header { padding: 18px 16px; background: #fff; border-bottom: 1px solid #e3e3df; text-align: center; }
+    header h1 { margin: 0; font-size: 20px; }
+    header p { margin: 4px 0 0; font-size: 14px; color: #6b6b66; }
+    main { max-width: 760px; margin: 0 auto; padding: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+    .card { background: #fff; border: 1px solid #e3e3df; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+    .card img, .card .noimg { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; background: #e8e8e4; display: block; }
+    .body { padding: 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+    .name { font-weight: 600; }
+    .price { font-size: 17px; }
+    .desc { font-size: 14px; color: #55554f; }
+    .left { font-size: 12px; color: #1d6b3a; }
+    .order { margin-top: auto; display: block; text-align: center; padding: 11px; border-radius: 8px; background: #1f6f5c; color: #fff; text-decoration: none; font-size: 15px; }
+    .empty { text-align: center; color: #6b6b66; padding: 40px 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>{{ business_name }}</h1>
+    <p>Available now. Tap an item to order on WhatsApp.</p>
+  </header>
+  <main>
+    {% if rows %}
+      <div class="grid">
+        {% for row in rows %}
+          <div class="card">
+            {% if row.item.image %}<img src="{{ row.item.image.url }}" alt="{{ row.item.name }}">{% else %}<div class="noimg"></div>{% endif %}
+            <div class="body">
+              <div class="name">{{ row.item.name }}</div>
+              <div class="price">GHS {{ row.item.price|floatformat:"-2" }}</div>
+              {% if row.item.description %}<div class="desc">{{ row.item.description }}</div>{% endif %}
+              {% if row.item.quantity <= 3 %}<div class="left">Only {{ row.item.quantity }} left</div>{% endif %}
+              {% if row.link %}<a class="order" href="{{ row.link }}" target="_blank" rel="noopener">Order on WhatsApp</a>{% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="empty">Nothing is available right now. Please check back soon.</p>
+    {% endif %}
+  </main>
+</body>
+</html>

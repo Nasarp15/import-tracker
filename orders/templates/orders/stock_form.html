@@ -1,0 +1,20 @@
+{% extends "orders/base.html" %}
+
+{% block title %}{% if item %}Edit stock item{% else %}New stock item{% endif %}{% endblock %}
+
+{% block content %}
+<style>
+  .current { width: 100%; max-height: 220px; object-fit: cover; border-radius: 12px; margin-bottom: 12px; }
+</style>
+
+<h1>{% if item %}Edit stock item{% else %}New stock item{% endif %}</h1>
+
+{% if item and item.image %}<img class="current" src="{{ item.image.url }}" alt="">{% endif %}
+
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  {% include "orders/_fields.html" %}
+  <button type="submit">Save</button>
+  <a class="cancel" href="{% url 'stock_list' %}">Cancel</a>
+</form>
+{% endblock %}

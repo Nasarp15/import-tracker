@@ -1,0 +1,44 @@
+{% extends "orders/base.html" %}
+
+{% block title %}Stock{% endblock %}
+
+{% block content %}
+<style>
+  .srow { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid #e3e3df; color: inherit; text-decoration: none; }
+  .sthumb { width: 56px; height: 56px; border-radius: 8px; background: #e8e8e4; object-fit: cover; flex: none; }
+  .sinfo { flex: 1; min-width: 0; }
+  .sright { text-align: right; flex: none; }
+  .shoplink { display: block; margin-bottom: 12px; font-size: 14px; }
+</style>
+
+<h1>Stock</h1>
+<a class="shoplink" href="{% url 'shop' %}" target="_blank" rel="noopener">View the public shop page &rarr;</a>
+
+{% for item in items %}
+  <a class="srow" href="{% url 'stock_edit' item.pk %}">
+    {% if item.image %}
+      <img class="sthumb" src="{{ item.image.url }}" alt="">
+    {% else %}
+      <div class="sthumb"></div>
+    {% endif %}
+    <div class="sinfo">
+      <strong>{{ item.name }}</strong>
+      <div class="muted">GHS {{ item.price|floatformat:"-2" }}</div>
+    </div>
+    <div class="sright">
+      <div>{{ item.quantity }} left</div>
+      {% if not item.is_visible %}
+        <span class="badge">Hidden</span>
+      {% elif item.quantity == 0 %}
+        <span class="badge">Sold out</span>
+      {% else %}
+        <span class="badge s-shipping_paid">On the shop</span>
+      {% endif %}
+    </div>
+  </a>
+{% empty %}
+  <p class="muted">No stock items yet.</p>
+{% endfor %}
+
+<a class="primary fab" href="{% url 'stock_create' %}">+ New stock item</a>
+{% endblock %}

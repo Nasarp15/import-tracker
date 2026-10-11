@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django import forms
+from django.db.models import F
 
 from .models import (
     Address,
@@ -9,6 +10,7 @@ from .models import (
     Order,
     OrderPhoto,
     Payment,
+    StockItem,
     normalize_phone,
 )
 
@@ -39,6 +41,7 @@ class OrderForm(forms.ModelForm):
         "customer_name",
         "delivery_details",
         "source_type",
+        "stock_item",
         "batch",
         "item_notes",
         "quantity",
@@ -51,6 +54,7 @@ class OrderForm(forms.ModelForm):
         model = Order
         fields = [
             "source_type",
+            "stock_item",
             "batch",
             "item_notes",
             "quantity",
@@ -60,6 +64,7 @@ class OrderForm(forms.ModelForm):
         ]
         labels = {
             "source_type": "Source",
+            "stock_item": "Stock item (Nigeria stock sales only)",
             "item_notes": "Item notes (colour, variant, size)",
             "quantity": "Quantity",
             "quoted_price": "Quoted price (total, GHS)",
@@ -75,12 +80,30 @@ class OrderForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["batch"].queryset = Batch.objects.exclude(status=Batch.Status.CLOSED)
         self.fields["batch"].empty_label = "No batch yet"
+        self.fields["stock_item"].queryset = StockItem.objects.filter(quantity__gt=0)
+        self.fields["stock_item"].empty_label = "Not from stock"
 
     def clean_customer_phone(self):
         phone = normalize_phone(self.cleaned_data["customer_phone"])
         if len(phone) < 9:
             raise forms.ValidationError("Enter a valid phone number.")
         return phone
+
+    def clean(self):
+        cleaned = super().clean()
+        stock = cleaned.get("stock_item")
+        if stock:
+            quantity = cleaned.get("quantity") or 1
+            if cleaned.get("source_type") != Order.SourceType.NIGERIA_STOCK:
+                self.add_error("stock_item", "Stock items are for Nigeria stock sales.")
+            elif quantity > stock.quantity:
+                self.add_error("quantity", f"Only {stock.quantity} left in stock.")
+            else:
+                if not cleaned.get("item_notes"):
+                    cleaned["item_notes"] = stock.name
+                if cleaned.get("quoted_price") is None:
+                    cleaned["quoted_price"] = stock.price * quantity
+        return cleaned
 
     def save_order(self):
         """Create (or find) the customer, then save the order and its photo."""
@@ -110,6 +133,11 @@ class OrderForm(forms.ModelForm):
 
         order.stage = Order.Stage.QUOTED if order.quoted_price else Order.Stage.REQUESTED
         order.save()
+
+        if order.stock_item_id:
+            StockItem.objects.filter(pk=order.stock_item_id).update(
+                quantity=F("quantity") - order.quantity
+            )
 
         if data.get("photo"):
             OrderPhoto.objects.create(order=order, image=data["photo"])
@@ -222,3 +250,28 @@ class BatchBillForm(forms.ModelForm):
         if margin < 0 or margin > 100:
             raise forms.ValidationError("Enter a percentage between 0 and 100.")
         return margin
+
+
+class StockItemForm(forms.ModelForm):
+    class Meta:
+        model = StockItem
+        fields = ["name", "description", "price", "quantity", "image", "is_visible"]
+        labels = {
+            "name": "Item name",
+            "description": "Short description",
+            "price": "Price (GHS)",
+            "quantity": "How many are available",
+            "image": "Photo",
+            "is_visible": "Show on the public shop page",
+        }
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 3}),
+            "image": forms.FileInput(attrs={"accept": "image/*"}),
+            "is_visible": forms.CheckboxInput(attrs={"style": "width:auto"}),
+        }
+
+    def clean_price(self):
+        price = self.cleaned_data["price"]
+        if price is None or price <= 0:
+            raise forms.ValidationError("Enter a price greater than zero.")
+        return price

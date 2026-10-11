@@ -1,3 +1,5 @@
+import os
+import uuid
 from decimal import Decimal
 
 from django.db import models, transaction
@@ -29,6 +31,25 @@ def normalize_phone(raw):
     if cleaned.startswith("0"):
         return "+233" + cleaned[1:]
     return "+" + cleaned
+
+
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+
+
+def _random_name(folder, filename):
+    """A random file name, so uploaded photos can't be found by guessing."""
+    extension = os.path.splitext(filename)[1].lower()
+    if extension not in IMAGE_EXTENSIONS:
+        extension = ".jpg"
+    return f"{folder}/{uuid.uuid4().hex}{extension}"
+
+
+def order_photo_path(instance, filename):
+    return _random_name("orders", filename)
+
+
+def stock_photo_path(instance, filename):
+    return _random_name("stock", filename)
 
 
 class Customer(models.Model):
@@ -205,6 +226,24 @@ class ShippingRule(models.Model):
         return f"{self.size_band}: {self.cost_min} to {upper} -> {self.fee}"
 
 
+class StockItem(models.Model):
+    """Goods she has in stock, shown to customers on the public shop page."""
+
+    name = models.CharField(max_length=120)
+    description = models.TextField(blank=True)
+    price = models.DecimalField(max_digits=12, decimal_places=2)
+    quantity = models.PositiveIntegerField(default=1)
+    image = models.ImageField(upload_to=stock_photo_path, blank=True)
+    is_visible = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.name} ({self.quantity} left)"
+
+
 class OrderQuerySet(models.QuerySet):
     def active(self):
         return self.filter(is_cancelled=False)
@@ -237,6 +276,13 @@ class Order(models.Model):
     )
     batch = models.ForeignKey(
         Batch, on_delete=models.SET_NULL, null=True, blank=True, related_name="orders"
+    )
+    stock_item = models.ForeignKey(
+        "StockItem",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="orders",
     )
     source_type = models.CharField(max_length=20, choices=SourceType.choices)
     item_notes = models.TextField(blank=True, help_text="Colour, variant, etc.")
@@ -346,7 +392,7 @@ class Order(models.Model):
 
 class OrderPhoto(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="photos")
-    image = models.ImageField(upload_to="orders/%Y/%m/")
+    image = models.ImageField(upload_to=order_photo_path)
     created_at = models.DateTimeField(auto_now_add=True)
 
 
