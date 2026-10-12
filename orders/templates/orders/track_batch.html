@@ -1,0 +1,45 @@
+{% extends "orders/public_base.html" %}
+
+{% block title %}{{ batch.label }}{% endblock %}
+
+{% block content %}
+<style>
+  .box { background: #fff; border: 1px solid #e3e3df; border-radius: 12px; padding: 14px; margin: 12px 0; }
+  .item { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #eeeeea; }
+  .item:last-child { border-bottom: 0; }
+  .status { font-size: 12px; padding: 3px 10px; border-radius: 6px; background: #d9f0e0; color: #1d6b3a; white-space: nowrap; }
+  .notice { background: #fdecc8; color: #7a4b00; padding: 10px 12px; border-radius: 8px; font-size: 14px; }
+</style>
+
+<p><a class="back" href="{% url 'track_batches' batch.source %}">&larr; All {{ batch.get_source_display }} batches</a></p>
+
+<div class="box">
+  <strong>{{ batch.label }}</strong>
+  <div class="muted">Batch status: {{ batch_status }}</div>
+</div>
+
+<h2>Find your items</h2>
+<form method="post">
+  {% csrf_token %}
+  {% include "orders/_fields.html" %}
+  <button type="submit">Show my items</button>
+</form>
+
+{% if blocked %}
+  <p class="notice">Too many tries. Please wait a few minutes and try again.</p>
+{% elif items is not None %}
+  {% if items %}
+    <h2>{% if first_name %}Hello {{ first_name }}, here are your items{% else %}Your items{% endif %}</h2>
+    <div class="box">
+      {% for item in items %}
+        <div class="item">
+          <div>{{ item.notes }}<div class="muted">Quantity: {{ item.quantity }}</div></div>
+          <span class="status">{{ item.status }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="notice">We could not find any items for that number in this batch. Please check the number, or message us on WhatsApp.</p>
+  {% endif %}
+{% endif %}
+{% endblock %}

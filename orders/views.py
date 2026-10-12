@@ -7,6 +7,7 @@ from django.db.models import Count, F, Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.views.decorators.cache import never_cache
 
 from .forms import (
     BatchBillForm,
@@ -17,11 +18,19 @@ from .forms import (
     QuoteForm,
     ShippingForm,
     StockItemForm,
+    TrackForm,
 )
-from .models import Batch, Order, Payment, StockItem
+from .models import Batch, Customer, Order, Payment, StockItem
 from .grouping import allocate_payment, customer_groups, group_totals
 from .profit import batch_profit
 from .shipping import split_bill, target_total
+from .tracking import (
+    BATCH_STATUS,
+    CUSTOMER_STATUS,
+    client_ip,
+    record_attempt,
+    too_many_attempts,
+)
 from .whatsapp import (
     arrival_link,
     confirmation_link,
@@ -520,6 +529,10 @@ def stock_create(request):
 @login_required
 def stock_edit(request, pk):
     item = get_object_or_404(StockItem, pk=pk)
+    if request.method == "POST" and request.POST.get("action") == "sold_out":
+        item.quantity = 0
+        item.save(update_fields=["quantity"])
+        return redirect("stock_list")
     if request.method == "POST":
         form = StockItemForm(request.POST, request.FILES, instance=item)
         if form.is_valid():
@@ -531,13 +544,95 @@ def stock_edit(request, pk):
 
 
 def shop(request):
-    """Public page: no login. Shows only visible items that are still in stock."""
+    """Public page: no login. Visible items are shown; sold-out ones are marked and listed last."""
     number = getattr(settings, "BUSINESS_WHATSAPP", "")
-    items = StockItem.objects.filter(is_visible=True, quantity__gt=0)
-    rows = [{"item": item, "link": stock_order_link(number, item)} for item in items]
-    context = {
-        "rows": rows,
-        "business_name": getattr(settings, "BUSINESS_NAME", "Our shop"),
-        "has_number": bool("".join(ch for ch in number if ch.isdigit())),
-    }
-    return render(request, "orders/shop.html", context)
+    items = list(StockItem.objects.filter(is_visible=True))
+    items.sort(key=lambda item: (item.quantity == 0, item.name.lower()))
+    rows = []
+    for item in items:
+        in_stock = item.quantity > 0
+        rows.append(
+            {
+                "item": item,
+                "sold_out": not in_stock,
+                "link": stock_order_link(number, item) if in_stock else None,
+                "size_link": (
+                    stock_order_link(number, item, with_size=True)
+                    if in_stock and item.size_list
+                    else None
+                ),
+            }
+        )
+    return render(request, "orders/shop.html", {"rows": rows, **_public_context()})
+
+
+# ------------------------------------------------- public order tracking (no login)
+
+
+def _public_context(**extra):
+    return {"business_name": getattr(settings, "BUSINESS_NAME", "Our shop"), **extra}
+
+
+@never_cache
+def track_home(request):
+    return render(request, "orders/track_home.html", _public_context())
+
+
+@never_cache
+def track_batches(request, source):
+    if source not in (Batch.Source.CHINA, Batch.Source.NIGERIA):
+        raise Http404
+    batches = (
+        Batch.objects.filter(source=source)
+        .exclude(status=Batch.Status.CLOSED)
+        .order_by("-id")[:12]
+    )
+    rows = [{"batch": b, "status": BATCH_STATUS[b.status]} for b in batches]
+    context = _public_context(rows=rows, source=Batch.Source(source).label)
+    return render(request, "orders/track_batches.html", context)
+
+
+@never_cache
+def track_batch(request, pk):
+    batch = get_object_or_404(Batch.objects.exclude(status=Batch.Status.CLOSED), pk=pk)
+    form = TrackForm(request.POST or None)
+    items = None
+    blocked = False
+    first_name = ""
+
+    if request.method == "POST" and form.is_valid():
+        phone = form.cleaned_data["phone"]
+        ip = client_ip(request)
+        if too_many_attempts(ip, phone):
+            blocked = True
+        else:
+            record_attempt(ip, phone)
+            customer = Customer.objects.filter(phone=phone).first()
+            orders = (
+                list(batch.orders.active().filter(customer=customer).order_by("created_at"))
+                if customer
+                else []
+            )
+            items = [
+                {
+                    "notes": " ".join(o.item_notes.split()) or "Your item",
+                    "quantity": o.quantity,
+                    "status": CUSTOMER_STATUS[o.stage],
+                }
+                for o in orders
+            ]
+            if customer and customer.name:
+                first_name = customer.name.split()[0]
+
+    context = _public_context(
+        batch=batch,
+        batch_status=BATCH_STATUS[batch.status],
+        form=form,
+        items=items,
+        blocked=blocked,
+        first_name=first_name,
+    )
+    response = render(request, "orders/track_batch.html", context)
+    if blocked:
+        response.status_code = 429
+    return response

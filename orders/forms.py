@@ -29,6 +29,7 @@ class OrderForm(forms.ModelForm):
         ),
     )
     customer_name = forms.CharField(label="Customer name", max_length=120, required=False)
+    size = forms.CharField(label="Size (if the item has sizes)", max_length=40, required=False)
     delivery_details = forms.CharField(
         label="Delivery address",
         required=False,
@@ -44,6 +45,7 @@ class OrderForm(forms.ModelForm):
         "stock_item",
         "batch",
         "item_notes",
+        "size",
         "quantity",
         "quoted_price",
         "cost",
@@ -103,6 +105,10 @@ class OrderForm(forms.ModelForm):
                     cleaned["item_notes"] = stock.name
                 if cleaned.get("quoted_price") is None:
                     cleaned["quoted_price"] = stock.price * quantity
+        size = (cleaned.get("size") or "").strip()
+        if size:
+            notes = cleaned.get("item_notes") or ""
+            cleaned["item_notes"] = f"{notes} (size {size})".strip()
         return cleaned
 
     def save_order(self):
@@ -255,10 +261,11 @@ class BatchBillForm(forms.ModelForm):
 class StockItemForm(forms.ModelForm):
     class Meta:
         model = StockItem
-        fields = ["name", "description", "price", "quantity", "image", "is_visible"]
+        fields = ["name", "description", "sizes", "price", "quantity", "image", "is_visible"]
         labels = {
             "name": "Item name",
             "description": "Short description",
+            "sizes": "Sizes (optional, separated by commas)",
             "price": "Price (GHS)",
             "quantity": "How many are available",
             "image": "Photo",
@@ -266,6 +273,7 @@ class StockItemForm(forms.ModelForm):
         }
         widgets = {
             "description": forms.Textarea(attrs={"rows": 3}),
+            "sizes": forms.TextInput(attrs={"placeholder": "S, M, L  or  38, 39, 40"}),
             "image": forms.FileInput(attrs={"accept": "image/*"}),
             "is_visible": forms.CheckboxInput(attrs={"style": "width:auto"}),
         }
@@ -275,3 +283,19 @@ class StockItemForm(forms.ModelForm):
         if price is None or price <= 0:
             raise forms.ValidationError("Enter a price greater than zero.")
         return price
+
+
+class TrackForm(forms.Form):
+    phone = forms.CharField(
+        label="Your phone number",
+        max_length=20,
+        widget=forms.TextInput(
+            attrs={"inputmode": "tel", "placeholder": "024 123 4567", "autocomplete": "tel"}
+        ),
+    )
+
+    def clean_phone(self):
+        phone = normalize_phone(self.cleaned_data["phone"])
+        if len(phone) < 9 or len(phone) > 16:
+            raise forms.ValidationError("Enter the phone number you used to order.")
+        return phone

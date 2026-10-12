@@ -17,4 +17,13 @@
   <button type="submit">Save</button>
   <a class="cancel" href="{% url 'stock_list' %}">Cancel</a>
 </form>
+
+{% if item and item.quantity > 0 %}
+  <form method="post" style="margin-top:12px" onsubmit="return confirm('Mark this item as sold out?');">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="sold_out">
+    <button type="submit" style="background:#fff;color:#7a4b00;border:1px solid #e3c98f">Mark as sold out</button>
+  </form>
+{% endif %}
+
 {% endblock %}

@@ -1,0 +1,26 @@
+{% extends "orders/public_base.html" %}
+
+{% block title %}Choose your batch{% endblock %}
+
+{% block content %}
+<style>
+  .batch { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: #fff; border: 1px solid #e3e3df; border-radius: 12px; padding: 14px; margin-bottom: 10px; color: inherit; text-decoration: none; }
+  .status { font-size: 12px; padding: 3px 10px; border-radius: 6px; background: #e8e8e4; color: #55554f; white-space: nowrap; }
+  .status.shipped { background: #dce8fb; color: #1d4d8f; }
+  .status.arrived { background: #d9f0e0; color: #1d6b3a; }
+</style>
+
+<p><a class="back" href="{% url 'track_home' %}">&larr; Back</a></p>
+<h2>{{ source }}: choose your batch</h2>
+
+{% for row in rows %}
+  <a class="batch" href="{% url 'track_batch' row.batch.pk %}">
+    <div>
+      <strong>{{ row.batch.label }}</strong>
+    </div>
+    <span class="status {{ row.batch.status }}">{{ row.status }}</span>
+  </a>
+{% empty %}
+  <p class="muted">There are no open batches right now.</p>
+{% endfor %}
+{% endblock %}

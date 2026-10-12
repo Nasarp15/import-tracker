@@ -233,12 +233,21 @@ class StockItem(models.Model):
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=12, decimal_places=2)
     quantity = models.PositiveIntegerField(default=1)
+    sizes = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Optional. Separate sizes with commas, e.g. S, M, L or 38, 39, 40.",
+    )
     image = models.ImageField(upload_to=stock_photo_path, blank=True)
     is_visible = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["name"]
+
+    @property
+    def size_list(self):
+        return [size.strip() for size in self.sizes.split(",") if size.strip()]
 
     def __str__(self):
         return f"{self.name} ({self.quantity} left)"
@@ -418,3 +427,11 @@ class Payment(models.Model):
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         self.order.refresh_stage_from_payments()
+
+
+class LookupAttempt(models.Model):
+    """One use of the public order-tracking page, kept briefly to limit guessing."""
+
+    ip = models.CharField(max_length=45)
+    phone = models.CharField(max_length=20)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)

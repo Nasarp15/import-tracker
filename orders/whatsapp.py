@@ -73,10 +73,18 @@ def arrival_message(order, bal):
         lines.append(f"- Shipping paid: {cur} {money(bal['shipping_paid'])}")
     if owed > 0:
         lines.append(f"- Shipping balance: {cur} {money(owed)}")
+    item_owed = bal["item_balance"] or 0
+    if item_owed > 0:
+        lines.append(f"- Item balance still to pay: {cur} {money(item_owed)}")
+        lines.append(f"- Total to pay now: {cur} {money(item_owed + owed)}")
     if order.address:
         lines.append(f"- Delivery to: {order.address.details}")
     lines.append("")
-    if owed > 0:
+    if item_owed > 0:
+        lines.append(
+            "Please send the total above and let me know when delivery suits you. Thank you!"
+        )
+    elif owed > 0:
         lines.append(
             "Please send the shipping fee and let me know when delivery suits you. Thank you!"
         )
@@ -162,10 +170,25 @@ def group_arrival_message(batch, customer, orders):
         lines.append(f"Shipping paid: {cur} {money(paid)}")
     if owed > 0:
         lines.append(f"Shipping balance: {cur} {money(owed)}")
+    item_owed = sum(
+        (
+            max(o.quoted_price - o.paid_total("item"), Decimal("0"))
+            for o in ready
+            if o.quoted_price
+        ),
+        Decimal("0"),
+    )
+    if item_owed > 0:
+        lines.append(f"Item balance still to pay: {cur} {money(item_owed)}")
+        lines.append(f"Total to pay now: {cur} {money(item_owed + owed)}")
     if len(addresses) == 1:
         lines.append(f"Delivery to: {next(iter(addresses))}")
     lines.append("")
-    if owed > 0:
+    if item_owed > 0:
+        lines.append(
+            "Please send the total above and let me know when delivery suits you. Thank you!"
+        )
+    elif owed > 0:
         lines.append(
             "Please send the shipping fee and let me know when delivery suits you. Thank you!"
         )
@@ -184,13 +207,18 @@ def group_arrival_link(batch, customer, orders):
     return _link_to(customer.phone, group_arrival_message(batch, customer, orders))
 
 
-def stock_order_link(number, item):
-    """WhatsApp link a customer taps to ask about a stock item. None if no number is set."""
+def stock_order_link(number, item, with_size=False):
+    """WhatsApp link a customer taps to ask about a stock item. None if no number is set.
+
+    With with_size=True the message contains the text __SIZE__, which the shop page
+    replaces with the size the customer picked.
+    """
     digits = "".join(ch for ch in (number or "") if ch.isdigit())
     if not digits:
         return None
+    name = f"{item.name}, size __SIZE__" if with_size else item.name
     text = (
-        f"Hello, I would like to order: {item.name} (GHS {money(item.price)}). "
+        f"Hello, I would like to order: {name} (GHS {money(item.price)}). "
         "Is it still available?"
     )
     return f"https://wa.me/{digits}?text={quote(text, safe='')}"

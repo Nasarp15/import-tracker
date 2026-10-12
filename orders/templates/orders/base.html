@@ -35,12 +35,16 @@
   </style>
 </head>
 <body>
-  <header>
-    <div style="display:flex;gap:16px"><a href="{% url 'order_list' %}">Orders</a><a href="{% url 'batch_list' %}">Batches</a><a href="{% url 'stock_list' %}">Stock</a></div>    {% if user.is_authenticated %}
-    <form method="post" action="{% url 'logout' %}">
-      {% csrf_token %}
-      <button type="submit">Log out</button>
-    </form>
+    <header style="flex-wrap:wrap;gap:6px">
+    <div style="display:flex;gap:16px"><a href="{% url 'order_list' %}">Orders</a><a href="{% url 'batch_list' %}">Batches</a><a href="{% url 'stock_list' %}">Stock</a></div>
+    {% if user.is_authenticated %}
+    <div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#55554f">
+      <span>Hello, {% firstof user.first_name user.username %}</span>
+      <form method="post" action="{% url 'logout' %}" style="margin:0">
+        {% csrf_token %}
+        <button type="submit">Log out</button>
+      </form>
+    </div>
     {% endif %}
   </header>
   <main>
