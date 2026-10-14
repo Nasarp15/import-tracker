@@ -48,3 +48,10 @@ def too_many_attempts(ip, phone):
 
 def record_attempt(ip, phone):
     LookupAttempt.objects.create(ip=ip, phone=phone[:20])
+
+
+def customer_status(order):
+    """The wording a customer sees for one of their items."""
+    if order.stage == Order.Stage.QUOTED and order.paid_total("item") > 0:
+        return "Part payment received"
+    return CUSTOMER_STATUS[order.stage]

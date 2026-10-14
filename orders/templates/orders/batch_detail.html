@@ -45,6 +45,7 @@
   {% if batch.shipped_on %}<div class="muted">Shipped {{ batch.shipped_on|date:"j M Y" }}</div>{% endif %}
   {% if batch.arrived_on %}<div class="muted">Arrived {{ batch.arrived_on|date:"j M Y" }}</div>{% endif %}
   <div class="muted">{{ total }} order{{ total|pluralize }} · {{ shipping_due }} shipping due · {{ delivered }} delivered</div>
+  {% if to_collect %}<div class="muted">Still to collect from customers: GHS {{ to_collect|floatformat:"-2" }}</div>{% endif %}
   {% if batch.status == "arrived" %}<p><a href="{% url 'batch_split' batch.pk %}">Split the shipping bill &rarr;</a></p>{% endif %}
 </div>
 
@@ -107,7 +108,7 @@
           <a href="{% url 'order_detail' order.pk %}">
             {{ order.item_notes|truncatechars:40|default:"No notes" }}
           </a>
-          <span class="badge s-{{ order.stage }}">{{ order.get_stage_display }}</span>
+          <span class="badge s-{{ order.stage }}">{% if order.stage == "quoted" %}Part paid{% else %}{{ order.get_stage_display }}{% endif %}</span>
           {% if is_open %}
             <form method="post">
               {% csrf_token %}
@@ -126,7 +127,7 @@
 
 {% if is_open %}
   <div class="card">
-    <h2>Add paid orders</h2>
+    <h2>Add paid or part-paid orders</h2>
     {% if assignable %}
       <form method="post">
         {% csrf_token %}
@@ -134,13 +135,13 @@
         {% for order in assignable %}
           <label class="check">
             <input type="checkbox" name="order_ids" value="{{ order.pk }}">
-            <span><strong>{{ order.customer.name|default:order.customer.phone }}</strong><br><span class="muted">{{ order.item_notes|truncatechars:40|default:"No notes" }} · {{ order.get_stage_display }}</span></span>
+            <span><strong>{{ order.customer.name|default:order.customer.phone }}</strong><br><span class="muted">{{ order.item_notes|truncatechars:40|default:"No notes" }} · {% if order.stage == "quoted" %}Part paid{% else %}{{ order.get_stage_display }}{% endif %}</span></span>
           </label>
         {% endfor %}
         <div class="gap"><button type="submit">Add selected</button></div>
       </form>
     {% else %}
-      <p class="muted">No paid {{ batch.get_source_display }} preorders are waiting for a batch.</p>
+      <p class="muted">No paid or part-paid {{ batch.get_source_display }} preorders are waiting for a batch.</p>
     {% endif %}
   </div>
 {% endif %}

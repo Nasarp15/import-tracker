@@ -26,8 +26,8 @@ from .profit import batch_profit
 from .shipping import split_bill, target_total
 from .tracking import (
     BATCH_STATUS,
-    CUSTOMER_STATUS,
     client_ip,
+    customer_status,
     record_attempt,
     too_many_attempts,
 )
@@ -251,14 +251,15 @@ def batch_is_open(batch):
 
 
 def assignable_orders(batch):
-    """Paid preorders from the same source that are not in any batch yet."""
+    """Paid or part-paid preorders from the same source that are not in any batch yet."""
     return (
         Order.objects.active()
+        .filter(batch__isnull=True, source_type=ASSIGNABLE_SOURCE[batch.source])
         .filter(
-            batch__isnull=True,
-            source_type=ASSIGNABLE_SOURCE[batch.source],
-            stage__in=[Order.Stage.PAID, Order.Stage.PURCHASED],
+            Q(stage__in=[Order.Stage.PAID, Order.Stage.PURCHASED])
+            | Q(stage=Order.Stage.QUOTED, payments__kind=Payment.Kind.ITEM)
         )
+        .distinct()
         .select_related("customer")
     )
 
@@ -325,7 +326,11 @@ def batch_detail(request, pk):
             if batch.status == Batch.Status.SHIPPED:
                 Order.objects.filter(
                     pk__in=ids,
-                    stage__in=[Order.Stage.PAID, Order.Stage.PURCHASED],
+                    stage__in=[
+                        Order.Stage.QUOTED,  # part paid
+                        Order.Stage.PAID,
+                        Order.Stage.PURCHASED,
+                    ],
                 ).update(stage=Order.Stage.IN_TRANSIT)
             messages.success(request, f"{len(ids)} orders added.")
 
@@ -349,10 +354,15 @@ def batch_detail(request, pk):
 
     orders = batch.orders.active().select_related("customer", "batch").prefetch_related("payments")
     order_list = list(orders)
+    groups = customer_groups(order_list)
+    to_collect = sum(
+        (g["item_balance"] + g["shipping_balance"] for g in groups), Decimal("0")
+    )
     context = {
         "batch": batch,
         "orders": orders,
-        "groups": customer_groups(order_list),
+        "groups": groups,
+        "to_collect": to_collect,
         "profit": (
             batch_profit(batch, order_list)
             if batch.status != Batch.Status.ORDERING
@@ -617,7 +627,7 @@ def track_batch(request, pk):
                 {
                     "notes": " ".join(o.item_notes.split()) or "Your item",
                     "quantity": o.quantity,
-                    "status": CUSTOMER_STATUS[o.stage],
+                    "status": customer_status(o),
                 }
                 for o in orders
             ]

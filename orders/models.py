@@ -149,7 +149,13 @@ class Batch(models.Model):
             self.save(update_fields=["status", "shipped_on"])
             return (
                 self.orders.active()
-                .filter(stage__in=[Order.Stage.PAID, Order.Stage.PURCHASED])
+                .filter(
+                    stage__in=[
+                        Order.Stage.QUOTED,  # part paid
+                        Order.Stage.PAID,
+                        Order.Stage.PURCHASED,
+                    ]
+                )
                 .update(stage=Order.Stage.IN_TRANSIT)
             )
 
@@ -166,6 +172,7 @@ class Batch(models.Model):
                 self.orders.active()
                 .filter(
                     stage__in=[
+                        Order.Stage.QUOTED,  # part paid
                         Order.Stage.PAID,
                         Order.Stage.PURCHASED,
                         Order.Stage.IN_TRANSIT,
@@ -374,6 +381,13 @@ class Order(models.Model):
             return None
         return self.shipping_fee - self.paid_total(Payment.Kind.SHIPPING)
 
+    @property
+    def item_balance(self):
+        """What the customer still owes for the item itself."""
+        if not self.quoted_price:
+            return Decimal("0")
+        return max(self.quoted_price - self.paid_total(Payment.Kind.ITEM), Decimal("0"))
+
     def refresh_stage_from_payments(self):
         """Advance the stage when the matching payment is complete."""
         if self.is_cancelled:
@@ -389,6 +403,7 @@ class Order(models.Model):
             self.stage == self.Stage.ARRIVED
             and self.shipping_fee is not None
             and self.paid_total(Payment.Kind.SHIPPING) >= self.shipping_fee
+            and self.item_balance <= 0
         ):
             new_stage = self.Stage.SHIPPING_PAID
         if new_stage:
