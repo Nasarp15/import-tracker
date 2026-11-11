@@ -90,3 +90,66 @@ def allocate_payment(orders, kind, amount, method):
             created.append(payment)
             remaining -= part
     return created
+
+
+
+def item_quantity_groups(orders):
+    """
+    Group orders by item name, calculate total quantities,
+    and identify the customers who ordered each item.
+    """
+    grouped = {}
+
+    for order in orders:
+        stock_item = getattr(order, "stock_item", None)
+
+        if stock_item:
+            item_name = stock_item.name.strip()
+        else:
+            item_name = (order.item_notes or "").strip()
+
+        if not item_name:
+            item_name = "Unnamed item"
+
+        key = " ".join(item_name.casefold().split())
+
+        if key not in grouped:
+            grouped[key] = {
+                "name": item_name,
+                "quantity": 0,
+                "order_count": 0,
+                "customers": {},
+            }
+
+        item = grouped[key]
+
+        item["quantity"] += order.quantity
+        item["order_count"] += 1
+
+        customer_id = order.customer_id
+
+        if customer_id not in item["customers"]:
+            item["customers"][customer_id] = {
+                "name": (
+                    order.customer.name
+                    or order.customer.phone
+                ),
+                "phone": order.customer.phone,
+                "quantity": 0,
+            }
+
+        item["customers"][customer_id]["quantity"] += order.quantity
+
+    results = []
+
+    for item in grouped.values():
+        item["customers"] = sorted(
+            item["customers"].values(),
+            key=lambda customer: customer["name"].casefold(),
+        )
+        results.append(item)
+
+    return sorted(
+        results,
+        key=lambda item: item["name"].casefold(),
+    )

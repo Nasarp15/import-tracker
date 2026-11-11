@@ -3,32 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ business_name }}</title>
+  <meta name="theme-color" content="#172b4d">
+  <title>{% block title %}{{ business_name }}{% endblock %}</title>
   <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f5f5f3; color: #1c1c1a; }
-    header { padding: 16px; background: #fff; border-bottom: 1px solid #e3e3df; text-align: center; }
-    header h1 { margin: 0; font-size: 20px; }
-    header nav { margin-top: 8px; display: flex; gap: 18px; justify-content: center; font-size: 14px; }
-    header nav a { color: #1f6f5c; text-decoration: none; }
-    main { max-width: 760px; margin: 0 auto; padding: 16px; }
-    h2 { font-size: 17px; margin: 18px 0 10px; }
-    .muted { color: #6b6b66; font-size: 13px; margin-top: 2px; }
-    .field { margin-bottom: 14px; }
-    .field label { display: block; font-size: 13px; color: #55554f; margin-bottom: 4px; }
-    input, select { width: 100%; padding: 10px; font-size: 16px; border: 1px solid #cfcfc9; border-radius: 8px; background: #fff; font-family: inherit; }
-    .errorlist { margin: 4px 0 0; padding: 0; list-style: none; color: #b3261e; font-size: 13px; }
-    button { display: block; width: 100%; padding: 12px; font-size: 16px; border: 0; border-radius: 8px; background: #1f6f5c; color: #fff; cursor: pointer; }
-    .back { color: #55554f; text-decoration: none; font-size: 14px; }
+    :root{--navy:#172b4d;--green:#16845b;--green-dark:#116b49;--green-soft:#eaf6ef;--page:#f4f7fa;--border:#e5ebf1;--text:#263449;--muted:#778396}*{box-sizing:border-box}
+    body{margin:0;min-height:100vh;background:var(--page);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.55}a{color:var(--green)}
+    header{padding:20px 16px 16px;background:#fff;border-bottom:1px solid var(--border);text-align:center}header h1{margin:0;color:var(--navy);font-size:22px;font-weight:800;letter-spacing:-.4px}header nav{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;margin-top:12px}header nav a{padding:8px 13px;border-radius:8px;color:#536278;font-size:13px;font-weight:650;text-decoration:none}header nav a:hover{background:var(--green-soft);color:var(--green-dark)}
+    main{width:min(calc(100% - 32px),980px);margin:0 auto;padding:26px 0 50px}h1,h2,h3{color:var(--navy);line-height:1.25;letter-spacing:-.25px}h2{font-size:19px}.muted{color:var(--muted);font-size:13px}
+    .field{margin-bottom:16px}.field label{display:block;margin-bottom:6px;color:#4b5b70;font-size:13px;font-weight:650}input,select,textarea{width:100%;min-height:44px;padding:10px 12px;border:1px solid #d8e0e8;border-radius:9px;background:#fff;color:var(--text);font:inherit}input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(22,132,91,.11)}
+    button{display:inline-flex;justify-content:center;align-items:center;width:100%;min-height:44px;padding:11px 16px;border:1px solid var(--green);border-radius:9px;background:var(--green);color:#fff;font:inherit;font-weight:700;cursor:pointer}button:hover{background:var(--green-dark)}.back{color:#617087;font-size:13px;font-weight:600;text-decoration:none}.errorlist{margin:5px 0 0;padding:0;color:#b42318;font-size:12px;list-style:none}
+    .box,.card{margin:14px 0;padding:18px;border:1px solid var(--border);border-radius:14px;background:#fff;box-shadow:0 4px 18px rgba(23,43,77,.04)}.status,.badge{display:inline-flex;padding:5px 9px;border-radius:999px;background:#edf1f5;color:#596a80;font-size:11px;font-weight:700;white-space:nowrap}.status.shipped{background:#e9f1ff;color:#285a9a}.status.arrived{background:var(--green-soft);color:var(--green-dark)}.notice{padding:12px 14px;border:1px solid #f0d29a;border-radius:10px;background:#fff6e5;color:#855900;font-size:13px}
+    @media(max-width:560px){main{width:min(calc(100% - 24px),100%);padding-top:20px}.box,.card{padding:15px}}
   </style>
 </head>
-<body>
-  <header>
-    <h1>{{ business_name }}</h1>
-    <nav><a href="{% url 'shop' %}">Shop</a><a href="{% url 'track_home' %}">Track my order</a></nav>
-  </header>
-  <main>
-    {% block content %}{% endblock %}
-  </main>
-</body>
+<body><header><h1>{{ business_name }}</h1><nav aria-label="Customer navigation"><a href="{% url 'shop' %}">Shop</a><a href="{% url 'track_home' %}">Track my order</a></nav></header><main>{% block content %}{% endblock %}</main></body>
 </html>

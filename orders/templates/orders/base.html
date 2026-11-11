@@ -3,52 +3,35 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Orders{% endblock %}</title>
+  <meta name="theme-color" content="#172b4d">
+  <title>{% block title %}Orders{% endblock %} | Import Tracker</title>
   <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f5f5f3; color: #1c1c1a; }
-    header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #fff; border-bottom: 1px solid #e3e3df; }
-    header a { font-weight: 600; font-size: 18px; color: inherit; text-decoration: none; }
-    header form { margin: 0; }
-    main { max-width: 520px; margin: 0 auto; padding: 16px 16px 90px; }
-    h1 { font-size: 20px; margin: 4px 0 16px; }
-    .muted { color: #6b6b66; font-size: 13px; margin-top: 2px; }
-    input, select, textarea { width: 100%; padding: 10px; font-size: 16px; border: 1px solid #cfcfc9; border-radius: 8px; background: #fff; font-family: inherit; }
-    .field { margin-bottom: 14px; }
-    .field label { display: block; font-size: 13px; color: #55554f; margin-bottom: 4px; }
-    .errorlist { margin: 4px 0 0; padding: 0; list-style: none; color: #b3261e; font-size: 13px; }
-    button, .primary { display: block; width: 100%; padding: 12px; font-size: 16px; border: 0; border-radius: 8px; background: #1f6f5c; color: #fff; text-align: center; text-decoration: none; cursor: pointer; }
-    header button { background: none; color: #55554f; font-size: 14px; padding: 4px 8px; width: auto; }
-    .cancel { display: block; text-align: center; margin-top: 12px; color: #55554f; }
-    .chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; }
-    .chip { white-space: nowrap; padding: 5px 12px; border: 1px solid #cfcfc9; border-radius: 999px; font-size: 13px; color: #55554f; text-decoration: none; background: #fff; }
-    .chip.on { background: #e1f0ec; border-color: #1f6f5c; color: #14503f; }
-    .order { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid #e3e3df; }
-    .thumb { width: 48px; height: 48px; border-radius: 8px; background: #e8e8e4; object-fit: cover; flex: none; }
-    .info { flex: 1; min-width: 0; }
-    .right { text-align: right; flex: none; }
-    .badge { font-size: 11px; padding: 2px 8px; border-radius: 6px; background: #e8e8e4; color: #55554f; white-space: nowrap; }
-    .s-arrived { background: #fdecc8; color: #7a4b00; }
-    .s-in_transit, .s-purchased { background: #dce8fb; color: #1d4d8f; }
-    .s-shipping_paid, .s-delivered { background: #d9f0e0; color: #1d6b3a; }
-    .fab { position: fixed; left: 16px; right: 16px; bottom: 16px; max-width: 488px; margin: 0 auto; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+    :root{color-scheme:light;--navy:#172b4d;--green:#16845b;--green-dark:#116b49;--green-soft:#eaf6ef;--page:#f4f7fa;--border:#e5ebf1;--text:#263449;--muted:#778396;--danger:#b42318;--radius:14px;--shadow:0 4px 18px rgba(23,43,77,.045)}
+    *{box-sizing:border-box}html{min-height:100%}body{margin:0;min-height:100vh;background:var(--page);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;line-height:1.55}a{color:var(--green)}
+    .app-header{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:68px;padding:12px clamp(18px,4vw,52px);background:rgba(255,255,255,.96);border-bottom:1px solid var(--border);backdrop-filter:blur(12px)}
+    .brand{display:inline-flex;align-items:center;gap:10px;color:var(--navy);font-size:17px;font-weight:800;letter-spacing:-.35px;text-decoration:none;white-space:nowrap}.brand-mark{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--green);color:#fff;font-size:15px;font-weight:800}
+    .app-nav{display:flex;align-items:center;flex-wrap:wrap;gap:5px}.app-nav a{padding:9px 13px;border-radius:9px;color:#536278;font-size:13px;font-weight:650;text-decoration:none;transition:background .15s,color .15s}.app-nav a:hover{color:var(--navy);background:#f0f4f8}
+    .header-user{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:13px;white-space:nowrap}.header-user form{margin:0}.header-user button{width:auto;padding:7px 11px;background:#fff;color:var(--navy);border:1px solid var(--border);font-size:12px}
+    main{width:min(calc(100% - 40px),1180px);margin:0 auto;padding:32px 0 90px}h1,h2,h3,h4{color:var(--navy);line-height:1.25;letter-spacing:-.3px}h1{margin:4px 0 20px;font-size:clamp(22px,3vw,28px);font-weight:780}h2{font-size:18px}h3{font-size:15px}p{line-height:1.6}.muted{color:var(--muted);font-size:13px}
+    .card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin:14px 0;box-shadow:var(--shadow)}.card h2{margin:0 0 14px}.field{margin-bottom:16px}.field label{display:block;margin-bottom:6px;color:#4b5b70;font-size:13px;font-weight:650}
+    input,select,textarea{width:100%;min-height:43px;padding:10px 12px;border:1px solid #d8e0e8;border-radius:9px;background:#fff;color:var(--text);font:inherit;outline:none;transition:border-color .15s,box-shadow .15s}textarea{min-height:100px;resize:vertical}input:focus,select:focus,textarea:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(22,132,91,.11)}input[type=checkbox],input[type=radio]{width:auto;min-height:auto}
+    button,.primary{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:42px;padding:10px 16px;border:1px solid var(--green);border-radius:9px;background:var(--green);color:#fff;font:inherit;font-size:13px;font-weight:700;text-align:center;text-decoration:none;cursor:pointer;transition:background .15s,transform .15s,box-shadow .15s}button:hover,.primary:hover{background:var(--green-dark);color:#fff;box-shadow:0 4px 12px rgba(22,132,91,.16)}button:active,.primary:active{transform:translateY(1px)}
+    .cancel,.back{display:inline-block;margin-top:12px;color:#617087;font-size:13px;font-weight:600;text-decoration:none}.cancel:hover,.back:hover{color:var(--green)}.chips{display:flex;flex-wrap:wrap;gap:7px;overflow-x:auto;padding:3px 0 12px;margin-bottom:8px}.chip{display:inline-flex;align-items:center;min-height:34px;padding:6px 13px;border:1px solid var(--border);border-radius:999px;background:#fff;color:#596a80;font-size:12px;font-weight:650;text-decoration:none;white-space:nowrap}.chip.on{border-color:#b8dfca;background:var(--green-soft);color:var(--green-dark)}
+    .order,.srow{display:flex;align-items:center;gap:13px;padding:14px 4px;border-bottom:1px solid #edf1f5;color:inherit;text-decoration:none;transition:background .15s}.order:hover,.srow:hover{background:#f8fafc}.order:last-child,.srow:last-child{border-bottom:0}.thumb,.sthumb{width:52px;height:52px;flex:none;border-radius:10px;background:#edf1f5;object-fit:cover}.info,.sinfo{flex:1;min-width:0}.right,.sright{flex:none;text-align:right}
+    .badge{display:inline-flex;align-items:center;padding:5px 9px;border-radius:999px;background:#edf1f5;color:#596a80;font-size:11px;font-weight:700;white-space:nowrap}.s-arrived{background:#fff3d6;color:#946200}.s-in_transit,.s-purchased{background:#e9f1ff;color:#285a9a}.s-shipping_paid,.s-delivered{background:var(--green-soft);color:var(--green-dark)}
+    .errorlist{margin:5px 0 0;padding:0;color:var(--danger);font-size:12px;list-style:none}.msg{margin:12px 0;padding:12px 15px;border:1px solid #b8dfca;border-radius:10px;background:var(--green-soft);color:var(--green-dark);font-size:13px}.msg.warning,.msg.error{border-color:#f0d29a;background:#fff6e5;color:#855900}
+    .page-header{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin:4px 0 22px}.page-header h1{margin:0 0 5px}.page-description{margin:0;color:var(--muted);font-size:13px}.list-panel{padding:8px 18px}.form-panel{max-width:760px}.form-panel form{max-width:100%}.form-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.form-actions .cancel{margin:0}.search-panel{margin:0 0 16px}.search-panel form{display:flex;gap:10px}.search-panel input{flex:1}.search-panel button{width:auto;white-space:nowrap}
+    .fab{position:fixed;z-index:10;right:max(22px,calc((100vw - 1180px)/2));bottom:22px;width:auto;min-width:150px;box-shadow:0 8px 24px rgba(23,43,77,.18)}.empty-state{padding:36px 20px;border:1px dashed #d6e0e9;border-radius:var(--radius);background:#fff;color:var(--muted);text-align:center}
+    @media(max-width:760px){.page-header{align-items:flex-start;flex-direction:column}.list-panel{padding:5px 13px}.search-panel form{flex-direction:column}.search-panel button{width:100%}.app-header{position:static;align-items:flex-start;flex-wrap:wrap;gap:10px;padding:13px 18px}.app-nav{order:3;width:100%;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px}.app-nav a{padding:8px 10px}.header-user{margin-left:auto}main{width:min(calc(100% - 28px),100%);padding-top:22px}.card{padding:16px;border-radius:12px}.fab{right:14px;bottom:14px;left:14px;width:auto}}
+    @media(max-width:420px){.brand{font-size:15px}.header-user span{display:none}.right,.sright{font-size:12px}}
   </style>
 </head>
 <body>
-    <header style="flex-wrap:wrap;gap:6px">
-    <div style="display:flex;gap:16px"><a href="{% url 'order_list' %}">Orders</a><a href="{% url 'batch_list' %}">Batches</a><a href="{% url 'stock_list' %}">Stock</a></div>
-    {% if user.is_authenticated %}
-    <div style="display:flex;align-items:center;gap:8px;font-size:14px;color:#55554f">
-      <span>Hello, {% firstof user.first_name user.username %}</span>
-      <form method="post" action="{% url 'logout' %}" style="margin:0">
-        {% csrf_token %}
-        <button type="submit">Log out</button>
-      </form>
-    </div>
-    {% endif %}
+  <header class="app-header">
+    <a class="brand" href="{% url 'dashboard' %}"><span class="brand-mark">I</span><span>Import Tracker</span></a>
+    <nav class="app-nav" aria-label="Main navigation"><a href="{% url 'dashboard' %}">Dashboard</a><a href="{% url 'order_list' %}">Orders</a><a href="{% url 'batch_list' %}">Batches</a><a href="{% url 'stock_list' %}">Inventory</a><a href="{% url 'reports' %}">Reports</a></nav>
+    {% if user.is_authenticated %}<div class="header-user"><span>Hello, {% firstof user.first_name user.username %}</span><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Log out</button></form></div>{% endif %}
   </header>
-  <main>
-    {% block content %}{% endblock %}
-  </main>
+  <main>{% block content %}{% endblock %}</main>
 </body>
 </html>

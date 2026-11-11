@@ -1,12 +1,17 @@
+import csv
+from datetime import timedelta
 from decimal import Decimal
 
+
+from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, F, Q
-from django.http import Http404
+from django.db.models import Count, F, Q, Sum
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.views.decorators.cache import never_cache
 
 from .forms import (
@@ -21,7 +26,12 @@ from .forms import (
     TrackForm,
 )
 from .models import Batch, Customer, Order, Payment, StockItem
-from .grouping import allocate_payment, customer_groups, group_totals
+from .grouping import (
+    allocate_payment,
+    customer_groups,
+    group_totals,
+    item_quantity_groups,
+)
 from .profit import batch_profit
 from .shipping import split_bill, target_total
 from .tracking import (
@@ -38,6 +48,27 @@ from .whatsapp import (
     group_confirmation_link,
     stock_order_link,
 )
+
+@login_required
+def dashboard(request):
+    """Staff overview with live summaries from the existing application data."""
+    active_orders = Order.objects.active()
+    open_batches = Batch.objects.exclude(status=Batch.Status.CLOSED)
+    stock_items = StockItem.objects.all()
+
+    context = {
+        "active_orders_count": active_orders.count(),
+        "in_transit_count": active_orders.filter(stage=Order.Stage.IN_TRANSIT).count(),
+        "arrived_count": active_orders.filter(stage=Order.Stage.ARRIVED).count(),
+        "open_batches_count": open_batches.count(),
+        "stock_items_count": stock_items.count(),
+        "low_stock_count": stock_items.filter(quantity__gt=0, quantity__lte=5).count(),
+        "out_of_stock_count": stock_items.filter(quantity=0).count(),
+        "recent_orders": active_orders.select_related("customer", "batch")[:6],
+        "active_batches": open_batches.order_by("-id")[:5],
+    }
+    return render(request, "orders/dashboard.html", context)
+
 
 STAGE_CHIPS = [
     ("", "All"),
@@ -123,6 +154,29 @@ def order_create(request):
     else:
         form = OrderForm()
     return render(request, "orders/order_form.html", {"form": form})
+
+
+@login_required
+def order_edit(request, pk):
+    order = get_object_or_404(Order.objects.active().select_related("customer", "address"), pk=pk)
+    if request.method == "POST":
+        form = OrderForm(request.POST, request.FILES, instance=order)
+        if form.is_valid():
+            try:
+                updated_order = form.save_order()
+            except forms.ValidationError as exc:
+                # A stock quantity may have changed between loading and saving.
+                form.add_error(None, exc)
+            else:
+                messages.success(request, "Order details updated successfully.")
+                return redirect("order_detail", pk=updated_order.pk)
+    else:
+        form = OrderForm(instance=order)
+    return render(
+        request,
+        "orders/order_edit.html",
+        {"form": form, "order": order},
+    )
 
 
 @login_required
@@ -293,6 +347,7 @@ def batch_create(request):
     return render(request, "orders/batch_form.html", {"form": form})
 
 
+
 @login_required
 def batch_detail(request, pk):
     batch = get_object_or_404(Batch, pk=pk)
@@ -302,14 +357,20 @@ def batch_detail(request, pk):
 
         if action == "ship" and batch.status == Batch.Status.ORDERING:
             moved = batch.mark_shipped()
-            messages.success(request, f"Batch shipped. {moved} orders moved to in transit.")
+            messages.success(
+                request,
+                f"Batch shipped. {moved} orders moved to in transit."
+            )
 
         elif action == "arrive" and batch.status in (
             Batch.Status.ORDERING,
             Batch.Status.SHIPPED,
         ):
             moved = batch.mark_arrived()
-            messages.success(request, f"Batch arrived. {moved} orders moved to arrived.")
+            messages.success(
+                request,
+                f"Batch arrived. {moved} orders moved to arrived."
+            )
 
         elif action == "close" and batch.status == Batch.Status.ARRIVED:
             batch.status = Batch.Status.CLOSED
@@ -322,46 +383,76 @@ def batch_detail(request, pk):
                 .filter(pk__in=request.POST.getlist("order_ids"))
                 .values_list("pk", flat=True)
             )
+
             Order.objects.filter(pk__in=ids).update(batch=batch)
+
             if batch.status == Batch.Status.SHIPPED:
                 Order.objects.filter(
                     pk__in=ids,
                     stage__in=[
-                        Order.Stage.QUOTED,  # part paid
+                        Order.Stage.QUOTED,
                         Order.Stage.PAID,
                         Order.Stage.PURCHASED,
                     ],
                 ).update(stage=Order.Stage.IN_TRANSIT)
+
             messages.success(request, f"{len(ids)} orders added.")
 
         elif action == "set_rate" and batch.status != Batch.Status.CLOSED:
             rate_form = BatchRateForm(request.POST, instance=batch)
+
             if rate_form.is_valid():
                 rate_form.save()
                 messages.success(request, "Exchange rate saved.")
             else:
-                messages.error(request, "Enter an exchange rate greater than zero.")
+                messages.error(
+                    request,
+                    "Enter an exchange rate greater than zero."
+                )
 
         elif action == "remove_order" and batch_is_open(batch):
-            Order.objects.filter(pk=request.POST.get("order_id"), batch=batch).update(
-                batch=None
-            )
+            Order.objects.filter(
+                pk=request.POST.get("order_id"),
+                batch=batch,
+            ).update(batch=None)
+
             messages.success(request, "Order removed from the batch.")
 
         else:
-            messages.error(request, "That action isn't available for this batch.")
+            messages.error(
+                request,
+                "That action isn't available for this batch."
+            )
+
         return redirect("batch_detail", pk=batch.pk)
 
-    orders = batch.orders.active().select_related("customer", "batch").prefetch_related("payments")
-    order_list = list(orders)
-    groups = customer_groups(order_list)
-    to_collect = sum(
-        (g["item_balance"] + g["shipping_balance"] for g in groups), Decimal("0")
+    orders = (
+        batch.orders.active()
+        .select_related("customer", "batch", "stock_item")
+        .prefetch_related("payments")
     )
+
+    order_list = list(orders)
+
+    # Existing customer grouping.
+    groups = customer_groups(order_list)
+
+    # New item grouping and total quantity calculation.
+    item_groups = item_quantity_groups(order_list)
+
+    to_collect = sum(
+        (
+            group["item_balance"] + group["shipping_balance"]
+            for group in groups
+        ),
+        Decimal("0"),
+    )
+
     context = {
         "batch": batch,
         "orders": orders,
         "groups": groups,
+        "item_groups": item_groups,
         "to_collect": to_collect,
         "profit": (
             batch_profit(batch, order_list)
@@ -369,14 +460,27 @@ def batch_detail(request, pk):
             else None
         ),
         "total": orders.count(),
-        "shipping_due": orders.filter(stage=Order.Stage.ARRIVED).count(),
-        "delivered": orders.filter(stage=Order.Stage.DELIVERED).count(),
+        "shipping_due": orders.filter(
+            stage=Order.Stage.ARRIVED
+        ).count(),
+        "delivered": orders.filter(
+            stage=Order.Stage.DELIVERED
+        ).count(),
         "next_action": BATCH_NEXT.get(batch.status),
         "is_open": batch_is_open(batch),
         "rate_form": BatchRateForm(instance=batch),
-        "assignable": assignable_orders(batch) if batch_is_open(batch) else [],
+        "assignable": (
+            assignable_orders(batch)
+            if batch_is_open(batch)
+            else []
+        ),
     }
-    return render(request, "orders/batch_detail.html", context)
+
+    return render(
+        request,
+        "orders/batch_detail.html",
+        context,
+    )
 
 
 @login_required
@@ -554,17 +658,16 @@ def stock_edit(request, pk):
 
 
 def shop(request):
-    """Public page: no login. Visible items are shown; sold-out ones are marked and listed last."""
+    """Public page: show only visible items that have stock available."""
     number = getattr(settings, "BUSINESS_WHATSAPP", "")
-    items = list(StockItem.objects.filter(is_visible=True))
-    items.sort(key=lambda item: (item.quantity == 0, item.name.lower()))
+    items = StockItem.objects.filter(is_visible=True, quantity__gt=0).order_by("name")
     rows = []
     for item in items:
         in_stock = item.quantity > 0
         rows.append(
             {
                 "item": item,
-                "sold_out": not in_stock,
+                "sold_out": False,
                 "link": stock_order_link(number, item) if in_stock else None,
                 "size_link": (
                     stock_order_link(number, item, with_size=True)
@@ -585,7 +688,97 @@ def _public_context(**extra):
 
 @never_cache
 def track_home(request):
-    return render(request, "orders/track_home.html", _public_context())
+    """Let a customer find all active orders using the phone number they ordered with."""
+    form = TrackForm(request.POST or None)
+    orders = None
+    customer = None
+    blocked = False
+    totals = None
+
+    if request.method == "POST" and form.is_valid():
+        phone = form.cleaned_data["phone"]
+        ip = client_ip(request)
+        if too_many_attempts(ip, phone):
+            blocked = True
+        else:
+            record_attempt(ip, phone)
+            customer = Customer.objects.filter(phone=phone).first()
+            if customer:
+                orders = list(
+                    customer.orders.active()
+                    .select_related("batch", "stock_item")
+                    .prefetch_related("payments")
+                    .order_by("-created_at")[:100]
+                )
+                # Calculate customer-visible balances from the already loaded payments.
+                item_total = item_paid = shipping_total = shipping_paid = Decimal("0")
+                for order in orders:
+                    paid_items = sum(
+                        (p.amount for p in order.payments.all() if p.kind == Payment.Kind.ITEM),
+                        Decimal("0"),
+                    )
+                    paid_shipping = sum(
+                        (p.amount for p in order.payments.all() if p.kind == Payment.Kind.SHIPPING),
+                        Decimal("0"),
+                    )
+                    if order.quoted_price is not None:
+                        item_total += order.quoted_price
+                        item_paid += paid_items
+                    if order.shipping_fee is not None:
+                        shipping_total += order.shipping_fee
+                        shipping_paid += paid_shipping
+                    order.customer_status_label = customer_status(order)
+                    timeline = [
+                        (Order.Stage.REQUESTED, "Order received"),
+                        (Order.Stage.QUOTED, "Quote prepared"),
+                        (Order.Stage.PAID, "Payment received"),
+                        (Order.Stage.PURCHASED, "Item purchased"),
+                        (Order.Stage.IN_TRANSIT, "On its way to Ghana"),
+                        (Order.Stage.ARRIVED, "Arrived in Ghana"),
+                        (Order.Stage.SHIPPING_PAID, "Ready for delivery"),
+                        (Order.Stage.DELIVERED, "Delivered"),
+                    ]
+                    current_index = next(
+                        (i for i, (stage, _label) in enumerate(timeline) if stage == order.stage),
+                        0,
+                    )
+                    order.progress_steps = [
+                        {"label": label, "complete": i <= current_index, "current": i == current_index}
+                        for i, (_stage, label) in enumerate(timeline)
+                    ]
+                    order.item_paid_display = paid_items
+                    order.item_balance_display = max(
+                        (order.quoted_price or Decimal("0")) - paid_items, Decimal("0")
+                    )
+                    order.shipping_paid_display = paid_shipping
+                    order.shipping_balance_display = (
+                        max(order.shipping_fee - paid_shipping, Decimal("0"))
+                        if order.shipping_fee is not None else None
+                    )
+                totals = {
+                    "item_total": item_total,
+                    "item_paid": item_paid,
+                    "item_balance": max(item_total - item_paid, Decimal("0")),
+                    "shipping_total": shipping_total,
+                    "shipping_paid": shipping_paid,
+                    "shipping_balance": max(shipping_total - shipping_paid, Decimal("0")),
+                }
+            else:
+                orders = []
+
+    context = _public_context(
+        form=form,
+        orders=orders,
+        customer=customer,
+        totals=totals,
+        blocked=blocked,
+    )
+    response = render(request, "orders/track_home.html", context)
+    if blocked:
+        response.status_code = 429
+    response["Referrer-Policy"] = "no-referrer"
+    response["X-Robots-Tag"] = "noindex, nofollow"
+    return response
 
 
 @never_cache
@@ -645,4 +838,113 @@ def track_batch(request, pk):
     response = render(request, "orders/track_batch.html", context)
     if blocked:
         response.status_code = 429
+    return response
+
+# --------------------------------------------------------------- reports
+
+def _report_period(request):
+    today = timezone.localdate()
+    default_start = today - timedelta(days=29)
+    start = parse_date(request.GET.get("start", "")) or default_start
+    end = parse_date(request.GET.get("end", "")) or today
+    if start > end:
+        start, end = end, start
+    return start, end
+
+
+def _build_report_data(start, end):
+    orders = list(
+        Order.objects.active()
+        .filter(created_at__date__range=(start, end))
+        .select_related("customer", "batch", "stock_item")
+        .prefetch_related("payments")
+        .order_by("-created_at")
+    )
+    sales = sum((o.quoted_price or Decimal("0") for o in orders), Decimal("0"))
+    item_outstanding = Decimal("0")
+    shipping_outstanding = Decimal("0")
+    for order in orders:
+        item_paid = sum(
+            (p.amount for p in order.payments.all() if p.kind == Payment.Kind.ITEM),
+            Decimal("0"),
+        )
+        shipping_paid = sum(
+            (p.amount for p in order.payments.all() if p.kind == Payment.Kind.SHIPPING),
+            Decimal("0"),
+        )
+        if order.quoted_price is not None:
+            item_outstanding += max(order.quoted_price - item_paid, Decimal("0"))
+        if order.shipping_fee is not None:
+            shipping_outstanding += max(order.shipping_fee - shipping_paid, Decimal("0"))
+
+    payments_received = Payment.objects.filter(
+        order__is_cancelled=False, paid_on__range=(start, end), currency="GHS"
+    ).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+
+    product_rows = item_quantity_groups(orders)[:10]
+    batch_ids = {o.batch_id for o in orders if o.batch_id}
+    batch_rows = []
+    for batch in Batch.objects.filter(pk__in=batch_ids).order_by("-id"):
+        batch_orders = list(
+            batch.orders.active()
+            .select_related("customer", "batch")
+            .prefetch_related("payments")
+        )
+        batch_rows.append({"batch": batch, "profit": batch_profit(batch, batch_orders)})
+
+    return {
+        "orders": orders,
+        "order_count": len(orders),
+        "sales": sales,
+        "payments_received": payments_received,
+        "item_outstanding": item_outstanding,
+        "shipping_outstanding": shipping_outstanding,
+        "total_outstanding": item_outstanding + shipping_outstanding,
+        "products": product_rows,
+        "batch_rows": batch_rows,
+    }
+
+
+@login_required
+def reports(request):
+    start, end = _report_period(request)
+    data = _build_report_data(start, end)
+    return render(
+        request,
+        "orders/reports.html",
+        {"start": start, "end": end, **data},
+    )
+
+
+@login_required
+def reports_export_csv(request):
+    start, end = _report_period(request)
+    data = _build_report_data(start, end)
+    response = HttpResponse(content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = (
+        f'attachment; filename="import-tracker-report-{start}-{end}.csv"'
+    )
+    response.write("\ufeff")  # Excel-friendly UTF-8 BOM.
+    writer = csv.writer(response)
+    writer.writerow(["Import Tracker report", f"{start} to {end}"])
+    writer.writerow([])
+    writer.writerow(["Metric", "Value"])
+    writer.writerow(["Orders", data["order_count"]])
+    writer.writerow(["Quoted item sales", data["sales"]])
+    writer.writerow(["Payments received during period", data["payments_received"]])
+    writer.writerow(["Outstanding item payments", data["item_outstanding"]])
+    writer.writerow(["Outstanding shipping payments", data["shipping_outstanding"]])
+    writer.writerow(["Total outstanding", data["total_outstanding"]])
+    writer.writerow([])
+    writer.writerow(["Best-selling products", "Quantity", "Orders"])
+    for product in data["products"]:
+        writer.writerow([product["name"], product["quantity"], product["order_count"]])
+    writer.writerow([])
+    writer.writerow(["Batch", "Sales (GHS)", "Cost (GHS)", "Item profit (GHS)", "Shipping result (GHS)", "Estimated total (GHS)"])
+    for row in data["batch_rows"]:
+        profit = row["profit"]
+        writer.writerow([
+            row["batch"].label, profit["sales"], profit["cost"],
+            profit["item_profit"], profit["shipping_result"], profit["total"],
+        ])
     return response

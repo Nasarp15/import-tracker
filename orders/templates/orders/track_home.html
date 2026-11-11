@@ -1,14 +1,80 @@
 {% extends "orders/public_base.html" %}
 
-{% block title %}Track my order{% endblock %}
+{% block title %}Track my orders{% endblock %}
 
 {% block content %}
 <style>
-  .choice { display: block; background: #fff; border: 1px solid #e3e3df; border-radius: 12px; padding: 18px; margin-bottom: 12px; color: inherit; text-decoration: none; font-size: 17px; font-weight: 600; }
-  .choice span { display: block; font-weight: 400; font-size: 13px; color: #6b6b66; margin-top: 4px; }
+  .track-intro{margin-bottom:20px}.track-intro h2{margin:0 0 6px;font-size:23px}.track-intro p{margin:0;color:var(--muted)}
+  .lookup-card,.order-card,.summary-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:17px;margin:14px 0;box-shadow:0 4px 18px rgba(23,43,77,.035)}
+  .lookup-card{max-width:560px}.lookup-card button{margin-top:5px}.help{margin:10px 0 0;color:var(--muted);font-size:12px}
+  .notice{padding:12px 14px;border-radius:10px;background:#fff5e5;border:1px solid #f0d29a;color:#855900;margin:14px 0}
+  .summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:18px 0}.summary-card{margin:0;padding:14px}.summary-card span{display:block;color:var(--muted);font-size:11px}.summary-card strong{display:block;color:var(--navy);font-size:19px;margin-top:4px}
+  .order-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.order-head h3{margin:0 0 4px;font-size:16px}.order-meta{color:var(--muted);font-size:12px}.order-status{background:var(--green-soft);color:var(--green-dark)}
+  .progress{display:flex;gap:4px;margin:17px 0 6px}.progress span{height:5px;flex:1;border-radius:99px;background:#e8edf2}.progress span.done{background:#16845b}.progress-labels{display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:10px}
+  .money{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;border-top:1px solid #edf1f5;margin-top:14px;padding-top:12px}.money div{display:flex;flex-direction:column}.money span{color:var(--muted);font-size:11px}.money strong{font-size:13px;color:var(--navy)}.balance{color:#a15c08!important}
+  @media(max-width:600px){.summary-grid{grid-template-columns:1fr 1fr}.summary-card:last-child{grid-column:span 2}.money{grid-template-columns:1fr 1fr}.order-head{flex-direction:column}}
 </style>
 
-<h2>Where was your order from?</h2>
-<a class="choice" href="{% url 'track_batches' 'china' %}">China<span>Orders shipped from China</span></a>
-<a class="choice" href="{% url 'track_batches' 'nigeria' %}">Nigeria<span>Orders shipped from Nigeria</span></a>
+<div class="track-intro">
+  <h2>Track your orders</h2>
+  <p>Enter the phone number you used when placing your orders.</p>
+</div>
+
+<div class="lookup-card">
+  <form method="post">
+    {% csrf_token %}
+    {% include "orders/_fields.html" with form=form %}
+    <button type="submit">Find my orders</button>
+  </form>
+  <p class="help">Use the same phone number you gave us when ordering. For your privacy, please do not use someone else's number.</p>
+</div>
+
+{% if blocked %}
+  <div class="notice">Too many lookup attempts. Please wait before trying again.</div>
+{% elif orders is not None %}
+  {% if orders %}
+    <h2>Hello{% if customer.name %}, {{ customer.name|title }}{% endif %}!</h2>
+    <p class="muted">We found {{ orders|length }} active or completed order{{ orders|length|pluralize }} for your number.</p>
+    <section class="summary-grid">
+      <div class="summary-card"><span>Items total</span><strong>GHS {{ totals.item_total|floatformat:"-2" }}</strong></div>
+      <div class="summary-card"><span>Items paid</span><strong>GHS {{ totals.item_paid|floatformat:"-2" }}</strong></div>
+      <div class="summary-card"><span>Items balance</span><strong>GHS {{ totals.item_balance|floatformat:"-2" }}</strong></div>
+      {% if totals.shipping_total %}
+        <div class="summary-card"><span>Shipping total</span><strong>GHS {{ totals.shipping_total|floatformat:"-2" }}</strong></div>
+        <div class="summary-card"><span>Shipping paid</span><strong>GHS {{ totals.shipping_paid|floatformat:"-2" }}</strong></div>
+        <div class="summary-card"><span>Shipping balance</span><strong>GHS {{ totals.shipping_balance|floatformat:"-2" }}</strong></div>
+      {% endif %}
+    </section>
+
+    <h2>Your order history</h2>
+    {% for order in orders %}
+      <article class="order-card">
+        <div class="order-head">
+          <div>
+            <h3>{{ order.item_notes|default:order.get_source_type_display|truncatechars:70 }}</h3>
+            <div class="order-meta">Order #{{ order.pk }} · {{ order.created_at|date:"j M Y" }} · Qty {{ order.quantity }}</div>
+            {% if order.batch %}<div class="order-meta">Shipment: {{ order.batch.label }}</div>{% endif %}
+          </div>
+          <span class="status order-status">{{ order.customer_status_label }}</span>
+        </div>
+        <div class="progress" aria-label="Order progress">
+          {% for step in order.progress_steps %}<span class="{% if step.complete %}done{% endif %}" title="{{ step.label }}"></span>{% endfor %}
+        </div>
+        <div class="progress-labels"><span>Received</span><span>Delivered</span></div>
+        <div class="money">
+          <div><span>Item total</span><strong>{% if order.quoted_price is not None %}GHS {{ order.quoted_price|floatformat:"-2" }}{% else %}Not quoted{% endif %}</strong></div>
+          <div><span>Item paid</span><strong>GHS {{ order.item_paid_display|floatformat:"-2" }}</strong></div>
+          <div><span>Item balance</span><strong class="balance">GHS {{ order.item_balance_display|floatformat:"-2" }}</strong></div>
+          {% if order.shipping_fee is not None %}
+            <div><span>Shipping fee</span><strong>GHS {{ order.shipping_fee|floatformat:"-2" }}</strong></div>
+            <div><span>Shipping paid</span><strong>GHS {{ order.shipping_paid_display|floatformat:"-2" }}</strong></div>
+            <div><span>Shipping balance</span><strong class="balance">GHS {{ order.shipping_balance_display|floatformat:"-2" }}</strong></div>
+          {% endif %}
+        </div>
+      </article>
+    {% endfor %}
+  {% else %}
+    <div class="notice">We couldn't find any current orders for that phone number. Please check the number you entered or contact us on WhatsApp.</div>
+  {% endif %}
+{% endif %}
 {% endblock %}

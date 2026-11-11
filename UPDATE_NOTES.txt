@@ -1,0 +1,35 @@
+IMPORT TRACKER - FUNCTIONAL UPDATES
+
+1. Order editing
+   - Open an order and use the new "Edit order details" link.
+   - You can update customer name, phone, delivery address, source, stock item,
+     batch, item notes, quantity, quoted price, cost and cost currency.
+   - Existing payment records and order stage are preserved.
+   - If a stock order's item or quantity changes, inventory is adjusted accordingly.
+
+2. Sold-out shop items
+   - Items with quantity zero are no longer displayed on the public shop page.
+   - The inventory record is retained in the staff inventory, so order history
+     and stock records are not permanently deleted.
+
+No database migration is required for these updates.
+
+3. Customer order tracking
+   - The public Track my order page now accepts the customer's phone number.
+   - It displays up to the 100 most recent non-cancelled orders for that number,
+     including order progress, batch, item totals, payments and outstanding balances.
+   - Existing lookup rate limits are retained. Tracking responses are not cached
+     and are marked no-index. Phone-number lookup is convenient but is not as
+     strong as identity verification; consider adding OTP verification before
+     exposing detailed balances to the public at larger scale.
+
+4. Reports and analytics
+   - Added a staff-only Reports page with a selectable date range.
+   - Shows orders placed, quoted item sales, payments received, current item and
+     shipping balances, best-selling products and batch profitability estimates.
+   - Added CSV export, which can be opened in Excel.
+   - Order and sales metrics use order creation dates; payment receipts use
+     payment dates. Batch profit is calculated for the full batch, not only the
+     selected date range, and is labelled accordingly in the report.
+
+No database migration is required for these updates.

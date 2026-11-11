@@ -1,14 +1,6 @@
 {% extends "orders/base.html" %}
-
 {% block title %}New batch{% endblock %}
-
 {% block content %}
-<h1>New batch</h1>
-
-<form method="post">
-  {% csrf_token %}
-  {% include "orders/_fields.html" %}
-  <button type="submit">Create batch</button>
-  <a class="cancel" href="{% url 'batch_list' %}">Cancel</a>
-</form>
+<div class="page-header"><div><h1>New batch</h1><p class="page-description">Create a shipment batch to group and manage customer orders.</p></div></div>
+<div class="card form-panel"><form method="post">{% csrf_token %}{% include "orders/_fields.html" %}<div class="form-actions"><button type="submit">Create batch</button><a class="cancel" href="{% url 'batch_list' %}">Cancel</a></div></form></div>
 {% endblock %}

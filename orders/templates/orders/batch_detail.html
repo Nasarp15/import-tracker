@@ -1,148 +1,911 @@
+
 {% extends "orders/base.html" %}
 
 {% block title %}{{ batch.label }}{% endblock %}
 
 {% block content %}
+
 <style>
-  .back { color: #55554f; text-decoration: none; font-size: 14px; }
-  .card { background: #fff; border: 1px solid #e3e3df; border-radius: 12px; padding: 14px; margin: 12px 0; }
-  .card h2 { font-size: 15px; margin: 0 0 10px; }
-  .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  .top h1 { margin: 0; font-size: 18px; }
-  .msg { padding: 10px 12px; border-radius: 8px; margin: 12px 0; font-size: 14px; background: #d9f0e0; color: #1d6b3a; }
-  .msg.error { background: #fdecc8; color: #7a4b00; }
-  .kv { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; }
-  .kv span:first-child { color: #6b6b66; }
-  .kv.total { border-top: 1px solid #e3e3df; margin-top: 6px; padding-top: 10px; font-weight: 600; }
-  .kv.total span:first-child { color: inherit; }
-  .ok { color: #1d6b3a; }
-  .warn { color: #7a4b00; }
-  .group { border-bottom: 1px solid #e3e3df; padding: 6px 0 10px; }
-  .group:last-child { border-bottom: 0; }
-  .ghead { display: flex; justify-content: space-between; gap: 8px; color: inherit; text-decoration: none; padding: 6px 0; }
-  .gright { text-align: right; font-size: 14px; }
-  .brow { display: flex; gap: 8px; align-items: center; padding: 6px 0 6px 12px; border-left: 3px solid #e3e3df; margin: 4px 0; }
-  .brow a { flex: 1; min-width: 0; color: inherit; text-decoration: none; font-size: 14px; }
-  .brow form { margin: 0; }
-  .rm { display: inline-block; width: auto; padding: 2px 8px; font-size: 12px; background: #fff; color: #b3261e; border: 1px solid #e3b5b1; }
-  .check { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid #eeeeea; font-size: 14px; }
-  .check input { width: auto; margin-top: 3px; }
-  .gap { margin-top: 12px; }
+/* =========================================
+   BATCH DETAIL - MODERN DASHBOARD
+========================================= */
+
+.batch-page {
+    --navy: #172b4d;
+    --green: #16845b;
+    --green-light: #eaf6ef;
+    --surface: #ffffff;
+    --background: #f6f8fa;
+    --border: #e8edf2;
+    --muted: #778396;
+    --text: #263449;
+
+    color: var(--text);
+}
+
+/* Page navigation */
+
+.batch-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 20px;
+    color: #52647c;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.batch-back:hover {
+    color: var(--green);
+}
+
+/* Notifications */
+
+.batch-page .msg {
+    margin-bottom: 15px;
+    padding: 12px 15px;
+    border-radius: 9px;
+}
+
+/* General cards */
+
+.batch-page .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 13px;
+    padding: 22px;
+    margin-bottom: 18px;
+    box-shadow: 0 2px 8px rgba(23, 43, 77, 0.035);
+}
+
+.batch-page h1 {
+    color: var(--navy);
+    font-size: 25px;
+    font-weight: 750;
+    margin: 0;
+    letter-spacing: -0.5px;
+}
+
+.batch-page h2 {
+    color: var(--navy);
+    font-size: 17px;
+    font-weight: 700;
+    margin: 0 0 18px;
+}
+
+.batch-page h3 {
+    color: var(--navy);
+    font-size: 13px;
+    font-weight: 700;
+    margin: 0 0 12px;
+}
+
+.batch-page .muted {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+/* Batch overview */
+
+.batch-overview {
+    border-top: 3px solid var(--green) !important;
+}
+
+.batch-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 15px;
+    margin-bottom: 10px;
+}
+
+.batch-source {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 7px;
+}
+
+.batch-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 12px;
+    border-radius: 20px;
+    background: #edf2f7;
+    color: #43536a;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.batch-status.shipped {
+    background: #eaf2ff;
+    color: #2861a8;
+}
+
+.batch-status.arrived {
+    background: var(--green-light);
+    color: var(--green);
+}
+
+.batch-dates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+    margin: 18px 0;
+    padding: 14px 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+}
+
+.batch-date {
+    color: #52647c;
+    font-size: 12px;
+}
+
+.batch-date strong {
+    color: var(--navy);
+}
+
+.batch-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.batch-stat {
+    background: var(--background);
+    border: 1px solid var(--border);
+    padding: 13px;
+    border-radius: 9px;
+}
+
+.batch-stat span {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+    margin-bottom: 6px;
+}
+
+.batch-stat strong {
+    color: var(--navy);
+    font-size: 18px;
+    font-weight: 750;
+}
+
+.collection-notice {
+    background: #fff8e9;
+    color: #956316;
+    padding: 12px 14px;
+    border-radius: 8px;
+    margin-top: 15px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.batch-split {
+    display: inline-flex;
+    margin-top: 16px;
+    color: var(--green);
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.batch-split:hover {
+    text-decoration: underline;
+}
+
+/* Forms */
+
+.batch-page form {
+    margin-top: 10px;
+}
+
+.batch-page button {
+    border: 0;
+    border-radius: 8px;
+    padding: 10px 16px;
+    background: var(--green);
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.batch-page button:hover {
+    background: #116b49;
+}
+
+.batch-page input:not([type="checkbox"]),
+.batch-page select,
+.batch-page textarea {
+    max-width: 100%;
+    border: 1px solid #dce3eb;
+    border-radius: 7px;
+    padding: 10px 12px;
+}
+
+.batch-page input:focus,
+.batch-page select:focus,
+.batch-page textarea:focus {
+    outline: none;
+    border-color: var(--green);
+}
+
+/* Next action */
+
+.batch-action {
+    margin-bottom: 18px;
+}
+
+.batch-action button {
+    padding: 12px 20px;
+}
+
+/* Items section */
+
+.item-details {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    background: white;
+}
+
+.item-details:last-child {
+    margin-bottom: 0;
+}
+
+.item-details summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+.item-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.item-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 15px 16px;
+    transition: background 0.2s;
+}
+
+.item-row:hover {
+    background: #f8fafb;
+}
+
+.item-details[open] .item-row {
+    background: #f6faf7;
+    border-bottom: 1px solid var(--border);
+}
+
+.item-name {
+    color: var(--navy);
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 5px;
+}
+
+.item-meta {
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.item-quantity {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    color: var(--green);
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.item-arrow {
+    display: inline-block;
+    color: #8290a2;
+    transition: transform 0.2s;
+}
+
+.item-details[open] .item-arrow {
+    transform: rotate(180deg);
+}
+
+/* Item customer list */
+
+.item-customers {
+    background: #fbfcfd;
+    padding: 15px 16px;
+}
+
+.item-customers h3 {
+    margin-bottom: 12px;
+}
+
+.item-customer-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+}
+
+.item-customer-row:last-child {
+    border-bottom: 0;
+}
+
+.item-customer-row strong {
+    color: var(--navy);
+}
+
+.customer-quantity {
+    background: var(--green-light);
+    color: var(--green);
+    border-radius: 6px;
+    padding: 6px 9px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+/* Customer groups */
+
+.group {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.group:last-child {
+    margin-bottom: 0;
+}
+
+.ghead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 15px;
+    background: #f9fafb;
+    text-decoration: none;
+    transition: background 0.2s;
+}
+
+.ghead:hover {
+    background: #f1f6f3;
+}
+
+.ghead strong {
+    color: var(--navy);
+    font-size: 13px;
+}
+
+.gright {
+    text-align: right;
+    color: var(--navy);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.gright .muted {
+    font-weight: 400;
+    margin-top: 4px;
+}
+
+/* Individual orders */
+
+.brow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 12px 15px;
+    border-top: 1px solid var(--border);
+}
+
+.brow > a {
+    flex: 1;
+    min-width: 100px;
+    color: #52647c;
+    font-size: 12px;
+    text-decoration: none;
+}
+
+.brow > a:hover {
+    color: var(--green);
+}
+
+.brow form {
+    margin: 0;
+}
+
+.brow button.rm {
+    background: #fff0ef;
+    color: #c14e46;
+    padding: 7px 10px;
+    font-size: 11px;
+}
+
+.brow button.rm:hover {
+    background: #ffe2df;
+}
+
+/* Existing badges */
+
+.batch-page .badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 20px;
+    padding: 5px 9px;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.batch-page .badge.s-arrived {
+    background: var(--green-light);
+    color: var(--green);
+}
+
+.batch-page .badge.s-in_transit {
+    background: #eaf2ff;
+    color: #2861a8;
+}
+
+/* Add orders */
+
+.batch-page .check {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+    padding: 12px 10px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    border-radius: 6px;
+}
+
+.batch-page .check:hover {
+    background: #f8fafb;
+}
+
+.batch-page .check input[type="checkbox"] {
+    margin-top: 3px;
+    accent-color: var(--green);
+}
+
+.batch-page .check strong {
+    color: var(--navy);
+    font-size: 12px;
+}
+
+.batch-page .check .muted {
+    font-size: 11px;
+}
+
+.batch-page .gap {
+    margin-top: 16px;
+}
+
+/* Empty states */
+
+.batch-empty {
+    padding: 22px 12px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+/* Mobile responsiveness */
+
+@media (max-width: 600px) {
+    .batch-page .card {
+        padding: 16px;
+        border-radius: 10px;
+    }
+
+    .batch-page h1 {
+        font-size: 21px;
+    }
+
+    .batch-heading {
+        align-items: flex-start;
+    }
+
+    .batch-stats {
+        gap: 7px;
+    }
+
+    .batch-stat {
+        padding: 10px 8px;
+    }
+
+    .batch-stat strong {
+        font-size: 15px;
+    }
+
+    .batch-stat span {
+        font-size: 10px;
+    }
+
+    .batch-dates {
+        flex-direction: column;
+        gap: 9px;
+    }
+
+    .item-row {
+        padding: 13px 11px;
+    }
+
+    .item-quantity {
+        font-size: 11px;
+    }
+
+    .item-customers {
+        padding: 12px;
+    }
+
+    .item-customer-row {
+        align-items: flex-start;
+    }
+
+    .ghead {
+        padding: 12px;
+    }
+
+    .brow {
+        padding: 11px;
+    }
+}
+
+@media (max-width: 380px) {
+    .batch-heading {
+        flex-direction: column;
+    }
+
+    .batch-stats {
+        grid-template-columns: 1fr;
+    }
+}
 </style>
 
-<p><a class="back" href="{% url 'batch_list' %}">&larr; All batches</a></p>
+<div class="batch-page">
 
-{% for message in messages %}
-  <div class="msg {{ message.tags }}">{{ message }}</div>
-{% endfor %}
+    <p>
+        <a class="batch-back" href="{% url 'batch_list' %}">
+            &larr; All batches
+        </a>
+    </p>
 
-<div class="card">
-  <div class="top">
-    <h1>{{ batch.label }}</h1>
-    <span class="badge {% if batch.status == 'shipped' %}s-in_transit{% elif batch.status == 'arrived' %}s-arrived{% endif %}">{{ batch.get_status_display }}</span>
-  </div>
-  <div class="muted">{{ batch.get_source_display }}</div>
-  {% if batch.shipped_on %}<div class="muted">Shipped {{ batch.shipped_on|date:"j M Y" }}</div>{% endif %}
-  {% if batch.arrived_on %}<div class="muted">Arrived {{ batch.arrived_on|date:"j M Y" }}</div>{% endif %}
-  <div class="muted">{{ total }} order{{ total|pluralize }} · {{ shipping_due }} shipping due · {{ delivered }} delivered</div>
-  {% if to_collect %}<div class="muted">Still to collect from customers: GHS {{ to_collect|floatformat:"-2" }}</div>{% endif %}
-  {% if batch.status == "arrived" %}<p><a href="{% url 'batch_split' batch.pk %}">Split the shipping bill &rarr;</a></p>{% endif %}
-</div>
+    {% for message in messages %}
+        <div class="msg {{ message.tags }}">{{ message }}</div>
+    {% endfor %}
 
-{% if batch.status != "closed" %}
-  <div class="card">
-    <h2>Exchange rate</h2>
-    <form method="post">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="set_rate">
-      {% include "orders/_fields.html" with form=rate_form %}
-      <button type="submit">Save rate</button>
-    </form>
-  </div>
-{% endif %}
+    <!-- BATCH OVERVIEW -->
 
-{% if next_action %}
-  <form method="post">
-    {% csrf_token %}
-    <input type="hidden" name="action" value="{{ next_action.0 }}">
-    <button type="submit">{{ next_action.1 }}</button>
-  </form>
-{% endif %}
+    <div class="card batch-overview">
 
-{% if profit %}
-  <div class="card">
-    <h2>Profit</h2>
-    <div class="kv"><span>Sales (selling prices)</span><span>GHS {{ profit.sales|floatformat:"-2" }}</span></div>
-    <div class="kv"><span>Item cost</span><span>GHS {{ profit.cost|floatformat:"-2" }}</span></div>
-    <div class="kv"><span>Item profit</span><span class="{% if profit.item_profit < 0 %}warn{% else %}ok{% endif %}">GHS {{ profit.item_profit|floatformat:"-2" }}</span></div>
-    {% if profit.shipping_result is not None %}
-      <div class="kv"><span>Shipping fees set</span><span>GHS {{ profit.fees_set|floatformat:"-2" }}</span></div>
-      <div class="kv"><span>Agent's bill</span><span>GHS {{ profit.bill|floatformat:"-2" }}</span></div>
-      <div class="kv"><span>Shipping result</span><span class="{% if profit.shipping_result < 0 %}warn{% else %}ok{% endif %}">GHS {{ profit.shipping_result|floatformat:"-2" }}</span></div>
-    {% else %}
-      <p class="muted">The shipping result shows once the agent's bill is entered (Split the shipping bill).</p>
-    {% endif %}
-    <div class="kv total"><span>{% if profit.shipping_result is None %}Profit so far (before shipping){% else %}Total profit{% endif %}</span><span class="{% if profit.total < 0 %}warn{% else %}ok{% endif %}">GHS {{ profit.total|floatformat:"-2" }}</span></div>
-    {% if profit.skipped %}
-      <p class="muted warn">{{ profit.skipped }} order{{ profit.skipped|pluralize }} left out: no selling price, or no cost in cedis (check the exchange rate).</p>
-    {% endif %}
-  </div>
-{% endif %}
+        <div class="batch-heading">
+            <div>
+                <h1>{{ batch.label }}</h1>
+                <div class="batch-source">{{ batch.get_source_display }}</div>
+            </div>
 
-<div class="card">
-  <h2>Customers in this batch</h2>
-  {% for group in groups %}
-    <div class="group">
-      <a class="ghead" href="{% url 'batch_customer' batch.pk group.customer.pk %}">
-        <div>
-          <strong>{{ group.customer.name|default:group.customer.phone }}</strong>
-          <div class="muted">{{ group.customer.phone }} · {{ group.orders|length }} item{{ group.orders|length|pluralize }}</div>
+            <span class="batch-status {% if batch.status == 'shipped' %}shipped{% elif batch.status == 'arrived' %}arrived{% endif %}">
+                {{ batch.get_status_display }}
+            </span>
         </div>
-        <div class="gright">
-          {% if group.item_total %}<div>GHS {{ group.item_total|floatformat:"-2" }}</div>{% endif %}
-          {% if group.shipping_total %}<div class="muted">Shipping GHS {{ group.shipping_total|floatformat:"-2" }}</div>{% endif %}
+
+        <div class="batch-dates">
+
+            {% if batch.shipped_on %}
+                <div class="batch-date">
+                    <strong>Shipped:</strong>
+                    {{ batch.shipped_on|date:"j M Y" }}
+                </div>
+            {% endif %}
+
+            {% if batch.arrived_on %}
+                <div class="batch-date">
+                    <strong>Arrived:</strong>
+                    {{ batch.arrived_on|date:"j M Y" }}
+                </div>
+            {% endif %}
+
         </div>
-      </a>
-      {% for order in group.orders %}
-        <div class="brow">
-          <a href="{% url 'order_detail' order.pk %}">
-            {{ order.item_notes|truncatechars:40|default:"No notes" }}
-          </a>
-          <span class="badge s-{{ order.stage }}">{% if order.stage == "quoted" %}Part paid{% else %}{{ order.get_stage_display }}{% endif %}</span>
-          {% if is_open %}
-            <form method="post">
-              {% csrf_token %}
-              <input type="hidden" name="action" value="remove_order">
-              <input type="hidden" name="order_id" value="{{ order.pk }}">
-              <button class="rm" type="submit">Remove</button>
-            </form>
-          {% endif %}
+
+        <div class="batch-stats">
+
+            <div class="batch-stat">
+                <span>Total orders</span>
+                <strong>{{ total }}</strong>
+            </div>
+
+            <div class="batch-stat">
+                <span>Shipping due</span>
+                <strong>{{ shipping_due }}</strong>
+            </div>
+
+            <div class="batch-stat">
+                <span>Delivered</span>
+                <strong>{{ delivered }}</strong>
+            </div>
+
         </div>
-      {% endfor %}
+
+        {% if to_collect %}
+            <div class="collection-notice">
+                Still to collect from customers:
+                GHS {{ to_collect|floatformat:"-2" }}
+            </div>
+        {% endif %}
+
+        {% if batch.status == "arrived" %}
+            <a class="batch-split" href="{% url 'batch_split' batch.pk %}">
+                Split the shipping bill &rarr;
+            </a>
+        {% endif %}
+
     </div>
-  {% empty %}
-    <p class="muted">No orders in this batch yet.</p>
-  {% endfor %}
+
+    <!-- EXCHANGE RATE -->
+
+    {% if batch.status != "closed" %}
+        <div class="card">
+            <h2>Exchange rate</h2>
+
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="set_rate">
+
+                {% include "orders/_fields.html" with form=rate_form %}
+
+                <button type="submit">Save rate</button>
+            </form>
+        </div>
+    {% endif %}
+
+    <!-- NEXT ACTION -->
+
+    {% if next_action %}
+        <div class="batch-action">
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="{{ next_action.0 }}">
+                <button type="submit">{{ next_action.1 }}</button>
+            </form>
+        </div>
+    {% endif %}
+
+    <!-- ITEMS IN BATCH -->
+
+    {% if profit %}
+        <div class="card">
+
+            <h2>Items in this batch</h2>
+
+            {% for item in item_groups %}
+
+                <details class="item-details">
+
+                    <summary class="item-row">
+
+                        <div>
+                            <div class="item-name">{{ item.name }}</div>
+
+                            <div class="item-meta">
+                                {{ item.order_count }} order{{ item.order_count|pluralize }}
+                                ·
+                                {{ item.customers|length }} customer{{ item.customers|length|pluralize }}
+                            </div>
+                        </div>
+
+                        <div class="item-quantity">
+                            {{ item.quantity }} units
+                            <span class="item-arrow">⌄</span>
+                        </div>
+
+                    </summary>
+
+                    <div class="item-customers">
+
+                        <h3>Customers who ordered this item</h3>
+
+                        {% for customer in item.customers %}
+
+                            <div class="item-customer-row">
+
+                                <div>
+                                    <strong>{{ customer.name }}</strong>
+                                    <div class="item-meta">{{ customer.phone }}</div>
+                                </div>
+
+                                <span class="customer-quantity">
+                                    {{ customer.quantity }} units
+                                </span>
+
+                            </div>
+
+                        {% empty %}
+
+                            <div class="batch-empty">
+                                No customers found.
+                            </div>
+
+                        {% endfor %}
+
+                    </div>
+
+                </details>
+
+            {% empty %}
+
+                <div class="batch-empty">
+                    No items in this batch yet.
+                </div>
+
+            {% endfor %}
+
+        </div>
+    {% endif %}
+
+    <!-- CUSTOMERS IN BATCH -->
+
+    <div class="card">
+
+        <h2>Customers in this batch</h2>
+
+        {% for group in groups %}
+
+            <div class="group">
+
+                <a class="ghead" href="{% url 'batch_customer' batch.pk group.customer.pk %}">
+
+                    <div>
+                        <strong>
+                            {{ group.customer.name|default:group.customer.phone }}
+                        </strong>
+
+                        <div class="muted">
+                            {{ group.customer.phone }} ·
+                            {{ group.orders|length }} item{{ group.orders|length|pluralize }}
+                        </div>
+                    </div>
+
+                    <div class="gright">
+
+                        {% if group.item_total %}
+                            <div>
+                                GHS {{ group.item_total|floatformat:"-2" }}
+                            </div>
+                        {% endif %}
+
+                        {% if group.shipping_total %}
+                            <div class="muted">
+                                Shipping GHS {{ group.shipping_total|floatformat:"-2" }}
+                            </div>
+                        {% endif %}
+
+                    </div>
+
+                </a>
+
+                {% for order in group.orders %}
+
+                    <div class="brow">
+
+                        <a href="{% url 'order_detail' order.pk %}">
+                            {{ order.item_notes|truncatechars:40|default:"No notes" }}
+                        </a>
+
+                        <span class="badge s-{{ order.stage }}">
+                            {% if order.stage == "quoted" %}
+                                Part paid
+                            {% else %}
+                                {{ order.get_stage_display }}
+                            {% endif %}
+                        </span>
+
+                        {% if is_open %}
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="remove_order">
+                                <input type="hidden" name="order_id" value="{{ order.pk }}">
+                                <button class="rm" type="submit">Remove</button>
+                            </form>
+                        {% endif %}
+
+                    </div>
+
+                {% endfor %}
+
+            </div>
+
+        {% empty %}
+
+            <div class="batch-empty">
+                No orders in this batch yet.
+            </div>
+
+        {% endfor %}
+
+    </div>
+
+    <!-- ADD ORDERS -->
+
+    {% if is_open %}
+
+        <div class="card">
+
+            <h2>Add paid or part-paid orders</h2>
+
+            {% if assignable %}
+
+                <form method="post">
+
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="add_orders">
+
+                    {% for order in assignable %}
+
+                        <label class="check">
+
+                            <input type="checkbox" name="order_ids" value="{{ order.pk }}">
+
+                            <span>
+
+                                <strong>
+                                    {{ order.customer.name|default:order.customer.phone }}
+                                </strong>
+
+                                <br>
+
+                                <span class="muted">
+                                    {{ order.item_notes|truncatechars:40|default:"No notes" }}
+                                    ·
+
+                                    {% if order.stage == "quoted" %}
+                                        Part paid
+                                    {% else %}
+                                        {{ order.get_stage_display }}
+                                    {% endif %}
+                                </span>
+
+                            </span>
+
+                        </label>
+
+                    {% endfor %}
+
+                    <div class="gap">
+                        <button type="submit">Add selected orders</button>
+                    </div>
+
+                </form>
+
+            {% else %}
+
+                <div class="batch-empty">
+                    No paid or part-paid {{ batch.get_source_display }} preorders are waiting for a batch.
+                </div>
+
+            {% endif %}
+
+        </div>
+
+    {% endif %}
+
 </div>
 
-{% if is_open %}
-  <div class="card">
-    <h2>Add paid or part-paid orders</h2>
-    {% if assignable %}
-      <form method="post">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="add_orders">
-        {% for order in assignable %}
-          <label class="check">
-            <input type="checkbox" name="order_ids" value="{{ order.pk }}">
-            <span><strong>{{ order.customer.name|default:order.customer.phone }}</strong><br><span class="muted">{{ order.item_notes|truncatechars:40|default:"No notes" }} · {% if order.stage == "quoted" %}Part paid{% else %}{{ order.get_stage_display }}{% endif %}</span></span>
-          </label>
-        {% endfor %}
-        <div class="gap"><button type="submit">Add selected</button></div>
-      </form>
-    {% else %}
-      <p class="muted">No paid or part-paid {{ batch.get_source_display }} preorders are waiting for a batch.</p>
-    {% endif %}
-  </div>
-{% endif %}
 {% endblock %}

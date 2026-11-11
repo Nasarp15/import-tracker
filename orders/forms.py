@@ -1,7 +1,8 @@
 from decimal import Decimal
 
 from django import forms
-from django.db.models import F
+from django.db import transaction
+from django.db.models import F, Q
 
 from .models import (
     Address,
@@ -82,8 +83,19 @@ class OrderForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["batch"].queryset = Batch.objects.exclude(status=Batch.Status.CLOSED)
         self.fields["batch"].empty_label = "No batch yet"
-        self.fields["stock_item"].queryset = StockItem.objects.filter(quantity__gt=0)
+        stock_queryset = StockItem.objects.filter(quantity__gt=0)
+        if self.instance and self.instance.pk and self.instance.stock_item_id:
+            stock_queryset = StockItem.objects.filter(
+                Q(quantity__gt=0) | Q(pk=self.instance.stock_item_id)
+            )
+        self.fields["stock_item"].queryset = stock_queryset
         self.fields["stock_item"].empty_label = "Not from stock"
+
+        if self.instance and self.instance.pk:
+            self.fields["customer_phone"].initial = self.instance.customer.phone
+            self.fields["customer_name"].initial = self.instance.customer.name
+            if self.instance.address_id:
+                self.fields["delivery_details"].initial = self.instance.address.details
 
     def clean_customer_phone(self):
         phone = normalize_phone(self.cleaned_data["customer_phone"])
@@ -112,42 +124,85 @@ class OrderForm(forms.ModelForm):
         return cleaned
 
     def save_order(self):
-        """Create (or find) the customer, then save the order and its photo."""
+        """Create or update an order and keep stock quantities in sync."""
         data = self.cleaned_data
 
-        customer, _ = Customer.objects.get_or_create(
-            phone=data["customer_phone"],
-            defaults={"name": data["customer_name"]},
-        )
-        if data["customer_name"] and not customer.name:
-            customer.name = data["customer_name"]
-            customer.save(update_fields=["name"])
-
-        order = self.save(commit=False)
-        order.customer = customer
-
-        details = data["delivery_details"].strip()
-        if details:
-            address = customer.addresses.filter(details=details).first()
-            if address is None:
-                address = Address.objects.create(
-                    customer=customer,
-                    details=details,
-                    is_default=not customer.addresses.exists(),
-                )
-            order.address = address
-
-        order.stage = Order.Stage.QUOTED if order.quoted_price else Order.Stage.REQUESTED
-        order.save()
-
-        if order.stock_item_id:
-            StockItem.objects.filter(pk=order.stock_item_id).update(
-                quantity=F("quantity") - order.quantity
+        with transaction.atomic():
+            is_new_order = not bool(self.instance.pk)
+            old_stock_id = self.instance.stock_item_id if not is_new_order else None
+            old_quantity = (
+                self.instance.quantity if not is_new_order and old_stock_id else 0
             )
+            order = self.save(commit=False)
+            new_stock_id = data["stock_item"].pk if data.get("stock_item") else None
+            new_quantity = data["quantity"] if new_stock_id else 0
 
-        if data.get("photo"):
-            OrderPhoto.objects.create(order=order, image=data["photo"])
+            # Lock the affected stock rows so simultaneous edits cannot oversell.
+            stock_ids = sorted({pk for pk in (old_stock_id, new_stock_id) if pk})
+            locked_stock = {
+                item.pk: item
+                for item in StockItem.objects.select_for_update().filter(pk__in=stock_ids)
+            }
+
+            if new_stock_id:
+                available = locked_stock[new_stock_id].quantity
+                if old_stock_id == new_stock_id:
+                    available += old_quantity
+                if new_quantity > available:
+                    raise forms.ValidationError(
+                        f"Only {available} left in stock. Please review the quantity."
+                    )
+
+            customer, _ = Customer.objects.get_or_create(
+                phone=data["customer_phone"],
+                defaults={"name": data["customer_name"]},
+            )
+            if data["customer_name"] and customer.name != data["customer_name"]:
+                customer.name = data["customer_name"]
+                customer.save(update_fields=["name"])
+
+            order.customer = customer
+            details = data["delivery_details"].strip()
+            if details:
+                address = customer.addresses.filter(details=details).first()
+                if address is None:
+                    address = Address.objects.create(
+                        customer=customer,
+                        details=details,
+                        is_default=not customer.addresses.exists(),
+                    )
+                order.address = address
+            else:
+                order.address = None
+
+            if is_new_order:
+                order.stage = (
+                    Order.Stage.QUOTED if order.quoted_price else Order.Stage.REQUESTED
+                )
+            order.save()
+
+            # Restore the previous stock allocation, then deduct the edited one.
+            if old_stock_id and old_stock_id != new_stock_id:
+                StockItem.objects.filter(pk=old_stock_id).update(
+                    quantity=F("quantity") + old_quantity
+                )
+            if new_stock_id:
+                if old_stock_id == new_stock_id:
+                    difference = old_quantity - new_quantity
+                    if difference:
+                        StockItem.objects.filter(pk=new_stock_id).update(
+                            quantity=F("quantity") + difference
+                        )
+                else:
+                    StockItem.objects.filter(pk=new_stock_id).update(
+                        quantity=F("quantity") - new_quantity
+                    )
+
+            if data.get("photo"):
+                OrderPhoto.objects.create(order=order, image=data["photo"])
+
         return order
+
 
 
 class PaymentForm(forms.ModelForm):

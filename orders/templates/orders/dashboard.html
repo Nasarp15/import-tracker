@@ -1,0 +1,101 @@
+{% extends "orders/base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-heading">
+  <div>
+    <p class="eyebrow">OVERVIEW</p>
+    <h1>Dashboard</h1>
+    <p class="page-description">A quick view of your orders, shipments and inventory.</p>
+  </div>
+  <div class="dashboard-actions">
+    <a class="primary" href="{% url 'order_create' %}">+ New order</a>
+    <a class="secondary-action" href="{% url 'batch_create' %}">+ New batch</a>
+  </div>
+</div>
+
+<section class="stat-grid" aria-label="Business summary">
+  <a class="stat-card" href="{% url 'order_list' %}">
+    <span class="stat-icon green-icon">↗</span>
+    <span class="stat-label">Active orders</span>
+    <strong class="stat-value">{{ active_orders_count }}</strong>
+    <span class="stat-foot">All orders not cancelled</span>
+  </a>
+  <a class="stat-card" href="{% url 'order_list' %}?stage=in_transit">
+    <span class="stat-icon blue-icon">⇢</span>
+    <span class="stat-label">In transit</span>
+    <strong class="stat-value">{{ in_transit_count }}</strong>
+    <span class="stat-foot">Currently being shipped</span>
+  </a>
+  <a class="stat-card" href="{% url 'batch_list' %}">
+    <span class="stat-icon purple-icon">▣</span>
+    <span class="stat-label">Open batches</span>
+    <strong class="stat-value">{{ open_batches_count }}</strong>
+    <span class="stat-foot">Not yet closed</span>
+  </a>
+  <a class="stat-card" href="{% url 'stock_list' %}">
+    <span class="stat-icon amber-icon">□</span>
+    <span class="stat-label">Stock products</span>
+    <strong class="stat-value">{{ stock_items_count }}</strong>
+    <span class="stat-foot">{{ low_stock_count }} low · {{ out_of_stock_count }} out of stock</span>
+  </a>
+</section>
+
+<section class="dashboard-columns">
+  <div class="card dashboard-panel">
+    <div class="panel-heading">
+      <div><h2>Recent orders</h2><p class="muted">The latest customer orders</p></div>
+      <a class="text-link" href="{% url 'order_list' %}">View all</a>
+    </div>
+    <div class="dashboard-list">
+      {% for order in recent_orders %}
+        <a class="dashboard-row" href="{% url 'order_detail' order.pk %}">
+          <span class="row-avatar">{{ order.customer.name|default:order.customer.phone|slice:":1"|upper }}</span>
+          <span class="row-main"><strong>{{ order.customer.name|default:order.customer.phone }}</strong><small>{{ order.item_notes|default:order.get_source_type_display|truncatechars:42 }}</small></span>
+          <span class="row-end"><span class="badge s-{{ order.stage }}">{{ order.get_stage_display }}</span><small>#{{ order.pk }}</small></span>
+        </a>
+      {% empty %}
+        <div class="empty-state compact-empty">No orders have been added yet.</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card dashboard-panel">
+    <div class="panel-heading">
+      <div><h2>Active shipments</h2><p class="muted">Batches still in progress</p></div>
+      <a class="text-link" href="{% url 'batch_list' %}">View all</a>
+    </div>
+    <div class="dashboard-list">
+      {% for batch in active_batches %}
+        <a class="dashboard-row batch-row" href="{% url 'batch_detail' batch.pk %}">
+          <span class="batch-mark">{% if batch.source == 'china' %}CN{% else %}NG{% endif %}</span>
+          <span class="row-main"><strong>{{ batch.label }}</strong><small>{{ batch.get_source_display }}</small></span>
+          <span class="row-end"><span class="badge">{{ batch.get_status_display }}</span><small>{{ batch.orders.count }} orders</small></span>
+        </a>
+      {% empty %}
+        <div class="empty-state compact-empty">There are no active batches.</div>
+      {% endfor %}
+    </div>
+    <div class="attention-note">
+      <span class="attention-dot"></span>
+      <span><strong>{{ arrived_count }} orders arrived</strong><small>Check whether shipping fees have been settled.</small></span>
+      <a href="{% url 'order_list' %}?stage=arrived" aria-label="View arrived orders">→</a>
+    </div>
+  </div>
+</section>
+
+<section class="quick-links">
+  <a href="{% url 'stock_create' %}"><span>＋</span><div><strong>Add inventory</strong><small>Record a new product</small></div><b>→</b></a>
+  <a href="{% url 'batch_create' %}"><span>＋</span><div><strong>Create a batch</strong><small>Start a new shipment</small></div><b>→</b></a>
+  <a href="{% url 'shop' %}" target="_blank" rel="noopener"><span>↗</span><div><strong>View public shop</strong><small>See what customers can order</small></div><b>→</b></a>
+</section>
+
+<style>
+  .dashboard-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin:4px 0 24px}.dashboard-heading h1{margin:2px 0 5px}.eyebrow{margin:0;color:var(--green);font-size:10px;font-weight:800;letter-spacing:1.5px}.dashboard-actions{display:flex;gap:9px;flex-wrap:wrap}.dashboard-actions .primary{margin:0}.secondary-action{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:9px 14px;border:1px solid var(--border);border-radius:9px;background:#fff;color:var(--navy);font-size:13px;font-weight:700;text-decoration:none}.secondary-action:hover{border-color:#b8dfca;color:var(--green-dark)}
+  .stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}.stat-card{position:relative;display:flex;flex-direction:column;min-height:154px;padding:18px;background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);color:inherit;text-decoration:none;transition:transform .15s,border-color .15s}.stat-card:hover{transform:translateY(-2px);border-color:#c8d9d0}.stat-icon{display:grid;place-items:center;width:34px;height:34px;margin-bottom:13px;border-radius:10px;font-size:19px;font-weight:800}.green-icon{background:#eaf6ef;color:#16845b}.blue-icon{background:#eaf1ff;color:#3566a5}.purple-icon{background:#f1edff;color:#7052b5}.amber-icon{background:#fff4df;color:#a36b08}.stat-label{color:var(--muted);font-size:12px;font-weight:650}.stat-value{margin-top:1px;color:var(--navy);font-size:27px;line-height:1.25;letter-spacing:-.8px}.stat-foot{margin-top:5px;color:var(--muted);font-size:11px}
+  .dashboard-columns{display:grid;grid-template-columns:1.15fr .85fr;gap:16px;align-items:start}.dashboard-panel{min-width:0;margin:0;padding:18px}.panel-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:13px;border-bottom:1px solid #edf1f5}.panel-heading h2{margin:0 0 3px}.panel-heading .muted{margin:0;font-size:11px}.text-link{color:var(--green);font-size:12px;font-weight:750;text-decoration:none;white-space:nowrap}.dashboard-list{min-height:80px}.dashboard-row{display:flex;align-items:center;gap:11px;padding:13px 1px;border-bottom:1px solid #edf1f5;color:inherit;text-decoration:none}.dashboard-row:last-child{border-bottom:0}.dashboard-row:hover .row-main strong{color:var(--green-dark)}.row-avatar,.batch-mark{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:11px;background:#edf6f0;color:var(--green-dark);font-size:13px;font-weight:800}.batch-mark{background:#eef2fb;color:#385783;font-size:11px}.row-main{display:flex;flex:1;flex-direction:column;min-width:0;gap:3px}.row-main strong{overflow:hidden;color:var(--navy);font-size:12px;text-overflow:ellipsis;white-space:nowrap}.row-main small,.row-end small{color:var(--muted);font-size:10px}.row-end{display:flex;flex:none;flex-direction:column;align-items:flex-end;gap:5px}.row-end .badge{font-size:9px;padding:4px 7px}.compact-empty{padding:22px 12px;margin:12px 0;font-size:12px}.attention-note{display:flex;align-items:center;gap:10px;margin-top:10px;padding:12px;border-radius:10px;background:#fff8e9}.attention-dot{width:8px;height:8px;flex:none;border-radius:50%;background:#d69a24}.attention-note span:nth-child(2){display:flex;flex:1;flex-direction:column;gap:2px}.attention-note strong{color:#77520b;font-size:11px}.attention-note small{color:#92733c;font-size:10px}.attention-note>a{color:#946200;font-size:18px;text-decoration:none}.quick-links{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}.quick-links>a{display:flex;align-items:center;gap:11px;padding:14px;background:#fff;border:1px solid var(--border);border-radius:12px;color:inherit;text-decoration:none}.quick-links>a>span{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;background:var(--green-soft);color:var(--green);font-size:18px;font-weight:700}.quick-links>a div{display:flex;flex:1;flex-direction:column;min-width:0}.quick-links strong{color:var(--navy);font-size:11px}.quick-links small{color:var(--muted);font-size:10px}.quick-links b{color:var(--muted);font-size:15px}.quick-links>a:hover{border-color:#b8dfca}
+  @media(max-width:900px){.stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-columns{grid-template-columns:1fr}}
+  @media(max-width:600px){.dashboard-heading{align-items:flex-start;flex-direction:column}.dashboard-actions{width:100%}.dashboard-actions a{flex:1}.stat-grid{gap:10px}.stat-card{min-height:140px;padding:14px}.stat-value{font-size:24px}.quick-links{grid-template-columns:1fr}.dashboard-panel{padding:14px}.row-end .badge{max-width:105px;overflow:hidden;text-overflow:ellipsis}}
+</style>
+{% endblock %}

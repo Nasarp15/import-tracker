@@ -35,6 +35,7 @@
     <h1>{{ order.customer.name|default:order.customer.phone }}</h1>
     <span class="badge s-{{ order.stage }}">{{ order.get_stage_display }}</span>
   </div>
+  <p><a class="primary" href="{% url 'order_edit' order.pk %}">Edit order details</a></p>
   <div class="muted">{{ order.customer.phone }}</div>
   {% if order.address %}<p>{{ order.address.details }}</p>{% endif %}
   <p>{{ order.item_notes|default:"No notes" }} (qty {{ order.quantity }})</p>

@@ -1,0 +1,35 @@
+{% extends "orders/base.html" %}
+{% block title %}Reports & Analytics{% endblock %}
+{% block content %}
+<style>
+  .report-heading{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin:5px 0 20px}.report-heading h1{margin:0 0 5px}.report-heading p{margin:0;color:var(--muted);font-size:13px}
+  .filter-panel,.report-panel{background:#fff;border:1px solid var(--border);border-radius:13px;padding:17px;margin-bottom:16px}.filter-form{display:flex;align-items:end;gap:12px;flex-wrap:wrap}.filter-form .field{margin:0;min-width:170px;flex:1}.filter-form button{width:auto;min-width:110px}.export-link{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:9px 14px;border:1px solid var(--border);border-radius:9px;background:#fff;color:var(--navy);font-size:13px;font-weight:700;text-decoration:none}
+  .metric-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px;margin-bottom:16px}.metric{padding:17px;background:#fff;border:1px solid var(--border);border-radius:13px}.metric span{display:block;color:var(--muted);font-size:12px}.metric strong{display:block;margin-top:5px;color:var(--navy);font-size:24px;letter-spacing:-.5px}.metric small{display:block;margin-top:4px;color:var(--muted);font-size:10px}
+  .report-columns{display:grid;grid-template-columns:1fr 1fr;gap:15px}.report-panel h2{margin:0 0 4px;font-size:16px}.report-panel>p{margin:0 0 13px;color:var(--muted);font-size:11px}.report-table{width:100%;border-collapse:collapse;font-size:12px}.report-table th,.report-table td{padding:10px 7px;border-bottom:1px solid #edf1f5;text-align:left}.report-table th{color:var(--muted);font-size:10px;font-weight:700}.report-table td:last-child,.report-table th:last-child{text-align:right}.report-table tr:last-child td{border-bottom:0}.empty{padding:20px;text-align:center;color:var(--muted);font-size:12px}.profit-note{padding:10px 12px;margin-top:10px;border-radius:9px;background:#f4f7fa;color:var(--muted);font-size:11px}
+  @media(max-width:760px){.report-heading{align-items:flex-start;flex-direction:column}.metric-grid{grid-template-columns:1fr 1fr}.report-columns{grid-template-columns:1fr}.filter-form button{width:100%}}
+  @media(max-width:430px){.metric-grid{grid-template-columns:1fr}.metric strong{font-size:22px}}
+</style>
+<div class="report-heading"><div><h1>Reports & Analytics</h1><p>Understand your sales, payments and business performance.</p></div><a class="export-link" href="{% url 'reports_export_csv' %}?start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}">Export CSV</a></div>
+<div class="filter-panel"><form method="get" class="filter-form"><div class="field"><label for="start">From</label><input type="date" id="start" name="start" value="{{ start|date:'Y-m-d' }}"></div><div class="field"><label for="end">To</label><input type="date" id="end" name="end" value="{{ end|date:'Y-m-d' }}"></div><button type="submit">Apply dates</button></form></div>
+<section class="metric-grid">
+  <div class="metric"><span>Orders placed</span><strong>{{ order_count }}</strong><small>Not cancelled · selected order dates</small></div>
+  <div class="metric"><span>Quoted item sales</span><strong>GHS {{ sales|floatformat:"-2" }}</strong><small>Value of orders created in this period</small></div>
+  <div class="metric"><span>Payments received</span><strong>GHS {{ payments_received|floatformat:"-2" }}</strong><small>Payments recorded during this period</small></div>
+  <div class="metric"><span>Outstanding item payments</span><strong>GHS {{ item_outstanding|floatformat:"-2" }}</strong><small>Current balances on orders in this period</small></div>
+  <div class="metric"><span>Outstanding shipping</span><strong>GHS {{ shipping_outstanding|floatformat:"-2" }}</strong><small>Current balances on orders in this period</small></div>
+  <div class="metric"><span>Total outstanding</span><strong>GHS {{ total_outstanding|floatformat:"-2" }}</strong><small>Item and shipping balances combined</small></div>
+</section>
+<div class="report-columns">
+  <section class="report-panel"><h2>Best-selling products</h2><p>Ranked by total quantity in orders placed during the selected period.</p>
+    <table class="report-table"><thead><tr><th>Product</th><th>Orders</th><th>Qty</th></tr></thead><tbody>
+      {% for product in products %}<tr><td>{{ product.name|truncatechars:35 }}</td><td>{{ product.order_count }}</td><td>{{ product.quantity }}</td></tr>{% empty %}<tr><td colspan="3" class="empty">No product sales in this period.</td></tr>{% endfor %}
+    </tbody></table>
+  </section>
+  <section class="report-panel"><h2>Batch performance</h2><p>Whole-batch estimates for batches containing orders from this period.</p>
+    <table class="report-table"><thead><tr><th>Batch</th><th>Item profit</th><th>Est. total</th></tr></thead><tbody>
+      {% for row in batch_rows %}<tr><td>{{ row.batch.label|truncatechars:28 }}</td><td>GHS {{ row.profit.item_profit|floatformat:"-2" }}</td><td>GHS {{ row.profit.total|floatformat:"-2" }}</td></tr>{% empty %}<tr><td colspan="3" class="empty">No batch activity in this period.</td></tr>{% endfor %}
+    </tbody></table>
+    <div class="profit-note">Batch profitability uses all active orders in each listed batch and the full batch freight bill. It is not restricted to the selected dates. Orders without a recorded cost are excluded from item-profit calculations.</div>
+  </section>
+</div>
+{% endblock %}

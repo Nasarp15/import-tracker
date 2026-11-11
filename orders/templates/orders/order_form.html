@@ -1,37 +1,11 @@
 {% extends "orders/base.html" %}
-
 {% block title %}New order{% endblock %}
-
 {% block content %}
-<h1>New order</h1>
-
-<form method="post" enctype="multipart/form-data" id="order-form" data-bound="{{ form.is_bound|yesno:'1,0' }}">
-  {% csrf_token %}
-  {{ form.non_field_errors }}
-  {% for field in form %}
-    <div class="field">
-      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-      {{ field }}
-      {{ field.errors }}
-    </div>
-  {% endfor %}
-  <button type="submit">Save order</button>
-  <a class="cancel" href="{% url 'order_list' %}">Cancel</a>
-</form>
-
+<div class="page-header"><div><h1>New order</h1><p class="page-description">Add a customer order and keep its details in one place.</p></div></div>
+<div class="card form-panel"><form method="post" enctype="multipart/form-data" id="order-form" data-bound="{{ form.is_bound|yesno:'1,0' }}">{% csrf_token %}{{ form.non_field_errors }}{% for field in form %}<div class="field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}<div class="form-actions"><button type="submit">Save order</button><a class="cancel" href="{% url 'order_list' %}">Cancel</a></div></form></div>
 <script>
-  var orderForm = document.getElementById("order-form");
-  var source = document.getElementById("id_source_type");
-  var costCurrency = document.getElementById("id_cost_currency");
-
-  function syncCostCurrency() {
-    costCurrency.value = source.value === "china_preorder" ? "CNY" : "NGN";  }
-
-  if (source && costCurrency) {
-    source.addEventListener("change", syncCostCurrency);
-    if (orderForm.dataset.bound === "0") {
-      syncCostCurrency();
-    }
-  }
+  var orderForm=document.getElementById("order-form");var source=document.getElementById("id_source_type");var costCurrency=document.getElementById("id_cost_currency");
+  function syncCostCurrency(){costCurrency.value=source.value==="china_preorder"?"CNY":"NGN";}
+  if(source&&costCurrency){source.addEventListener("change",syncCostCurrency);if(orderForm.dataset.bound==="0"){syncCostCurrency();}}
 </script>
 {% endblock %}
