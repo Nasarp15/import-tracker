@@ -48,7 +48,7 @@
     <div class="srow">
       <div class="sinfo">
         <strong>{{ row.order.customer.name|default:row.order.customer.phone }}</strong>
-        <div class="muted">{{ row.order.item_notes|truncatechars:30|default:"No notes" }} · cost {% if row.cost %}GHS {{ row.cost|floatformat:"-2" }}{% else %}<span class="warn">needs a cost or exchange rate</span>{% endif %}</div>
+        <div class="muted">{{ row.order.item_description|truncatechars:45 }} · cost {% if row.cost %}GHS {{ row.cost|floatformat:"-2" }}{% else %}<span class="warn">needs a cost or exchange rate</span>{% endif %}</div>
         {% if row.order.shipping_fee is not None %}<div class="muted">Fee set: GHS {{ row.order.shipping_fee|floatformat:"-2" }}</div>{% endif %}
       </div>
       <div class="sshare">

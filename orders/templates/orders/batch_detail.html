@@ -688,77 +688,43 @@
         </div>
     {% endif %}
 
-    <!-- ITEMS IN BATCH -->
+    <!-- SHOPPING LIST -->
 
-    {% if profit %}
-        <div class="card">
+    <div class="card">
+        <h2>Shopping list</h2>
+        <p class="muted">Items to purchase for this batch, ranked by total pieces ordered. Cancelled orders are excluded.</p>
 
-            <h2>Items in this batch</h2>
-
-            {% for item in item_groups %}
-
-                <details class="item-details">
-
-                    <summary class="item-row">
-
-                        <div>
-                            <div class="item-name">{{ item.name }}</div>
-
-                            <div class="item-meta">
-                                {{ item.order_count }} order{{ item.order_count|pluralize }}
-                                ·
-                                {{ item.customers|length }} customer{{ item.customers|length|pluralize }}
-                            </div>
-                        </div>
-
-                        <div class="item-quantity">
-                            {{ item.quantity }} units
-                            <span class="item-arrow">⌄</span>
-                        </div>
-
-                    </summary>
-
-                    <div class="item-customers">
-
-                        <h3>Customers who ordered this item</h3>
-
-                        {% for customer in item.customers %}
-
-                            <div class="item-customer-row">
-
-                                <div>
-                                    <strong>{{ customer.name }}</strong>
-                                    <div class="item-meta">{{ customer.phone }}</div>
-                                </div>
-
-                                <span class="customer-quantity">
-                                    {{ customer.quantity }} units
-                                </span>
-
-                            </div>
-
-                        {% empty %}
-
-                            <div class="batch-empty">
-                                No customers found.
-                            </div>
-
-                        {% endfor %}
-
+        {% for item in item_groups %}
+            <details class="item-details">
+                <summary class="item-row">
+                    <div>
+                        <div class="item-name">{{ item.name }}</div>
+                        <div class="item-meta">{{ item.people }} customer{{ item.people|pluralize }}</div>
                     </div>
-
-                </details>
-
-            {% empty %}
-
-                <div class="batch-empty">
-                    No items in this batch yet.
+                    <div class="item-quantity">{{ item.quantity }} pieces <span class="item-arrow">⌄</span></div>
+                </summary>
+                <div class="item-customers">
+                    <h3>Who ordered</h3>
+                    {% for customer in item.customers %}
+                        <div class="item-customer-row">
+                            <div>
+                                <strong>{{ customer.name }}</strong>
+                                <div class="item-meta">{{ customer.phone }}</div>
+                                {% for detail in customer.details %}
+                                    <div class="item-meta">{{ detail }}</div>
+                                {% endfor %}
+                            </div>
+                            <span class="customer-quantity">{{ customer.quantity }} piece{{ customer.quantity|pluralize }}</span>
+                        </div>
+                    {% empty %}
+                        <div class="batch-empty">No customers found.</div>
+                    {% endfor %}
                 </div>
-
-            {% endfor %}
-
-        </div>
-    {% endif %}
+            </details>
+        {% empty %}
+            <div class="batch-empty">No active orders to include in the shopping list yet.</div>
+        {% endfor %}
+    </div>
 
     <!-- CUSTOMERS IN BATCH -->
 
@@ -806,7 +772,7 @@
                     <div class="brow">
 
                         <a href="{% url 'order_detail' order.pk %}">
-                            {{ order.item_notes|truncatechars:40|default:"No notes" }}
+                            {{ order.item_description|truncatechars:55 }}
                         </a>
 
                         <span class="badge s-{{ order.stage }}">
@@ -872,7 +838,7 @@
                                 <br>
 
                                 <span class="muted">
-                                    {{ order.item_notes|truncatechars:40|default:"No notes" }}
+                                    {{ order.item_description|truncatechars:55 }}
                                     ·
 
                                     {% if order.stage == "quoted" %}

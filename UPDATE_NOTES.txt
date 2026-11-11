@@ -33,3 +33,23 @@ No database migration is required for these updates.
      selected date range, and is labelled accordingly in the report.
 
 No database migration is required for these updates.
+
+5. Shopping list
+   - Each batch now has a Shopping List available at every batch stage.
+   - Items are grouped by normalized item name (case-insensitive and whitespace-insensitive).
+   - Shows distinct customers and total pieces; repeat orders by one customer count as one person.
+   - Cancelled orders are excluded and items are sorted by total pieces, highest first.
+   - Expand an item to see each customer, their combined quantity, and their distinct details.
+   - Existing orders without an item_name continue to group using their old item_notes value.
+
+6. Improved order form
+   - New orders have a required Item name and optional Details field.
+   - Previously used item names are suggested as the user types.
+   - Customer-facing order lists and WhatsApp messages show the full description
+     as "Item name - Details" when details are provided.
+   - A database migration adds the item_name field. Existing order records and
+     payment records are preserved; legacy item descriptions remain available.
+
+   Apply the new migration with: python manage.py migrate
+
+   No WhatsApp supplier shopping-list feature is included in this update.

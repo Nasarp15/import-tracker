@@ -51,7 +51,7 @@
       <article class="order-card">
         <div class="order-head">
           <div>
-            <h3>{{ order.item_notes|default:order.get_source_type_display|truncatechars:70 }}</h3>
+            <h3>{{ order.item_description|default:order.get_source_type_display|truncatechars:70 }}</h3>
             <div class="order-meta">Order #{{ order.pk }} · {{ order.created_at|date:"j M Y" }} · Qty {{ order.quantity }}</div>
             {% if order.batch %}<div class="order-meta">Shipment: {{ order.batch.label }}</div>{% endif %}
           </div>

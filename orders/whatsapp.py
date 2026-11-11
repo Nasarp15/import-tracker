@@ -20,8 +20,8 @@ def _first_name(order):
 
 
 def _item_line(order):
-    notes = " ".join(order.item_notes.split()) or "your item"
-    return f"{notes} (qty {order.quantity})"
+    description = " ".join(order.item_description.split()) or "your item"
+    return f"{description} (qty {order.quantity})"
 
 
 def _signoff():

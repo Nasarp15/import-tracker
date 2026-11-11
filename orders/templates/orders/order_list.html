@@ -10,7 +10,7 @@
 {% for order in orders %}
   <a class="order" href="{% url 'order_detail' order.pk %}">
     {% with photo=order.photos.all|first %}{% if photo %}<img class="thumb" src="{{ photo.image.url }}" alt="">{% else %}<div class="thumb"></div>{% endif %}{% endwith %}
-    <div class="info"><strong>{{ order.customer.name|default:order.customer.phone }}</strong><div class="muted">{{ order.item_notes|truncatechars:40|default:"No notes" }}</div><div class="muted">{{ order.get_source_type_display }}{% if order.batch %} · {{ order.batch.label }}{% endif %}</div></div>
+    <div class="info"><strong>{{ order.customer.name|default:order.customer.phone }}</strong><div class="muted">{{ order.item_description|truncatechars:55 }}</div><div class="muted">{{ order.get_source_type_display }}{% if order.batch %} · {{ order.batch.label }}{% endif %}</div></div>
     <div class="right"><span class="badge s-{{ order.stage }}">{{ order.get_stage_display }}</span>{% if order.quoted_price %}<div class="muted">{{ order.currency }} {{ order.quoted_price|floatformat:"-2" }}</div>{% endif %}</div>
   </a>
 {% empty %}<div class="empty-state">No orders match your search yet.</div>{% endfor %}

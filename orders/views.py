@@ -137,6 +137,7 @@ def order_list(request):
         orders = orders.filter(
             Q(customer__name__icontains=q)
             | Q(customer__phone__icontains=q)
+            | Q(item_name__icontains=q)
             | Q(item_notes__icontains=q)
         )
 
@@ -818,7 +819,7 @@ def track_batch(request, pk):
             )
             items = [
                 {
-                    "notes": " ".join(o.item_notes.split()) or "Your item",
+                    "notes": " ".join(o.item_description.split()) or "Your item",
                     "quantity": o.quantity,
                     "status": customer_status(o),
                 }

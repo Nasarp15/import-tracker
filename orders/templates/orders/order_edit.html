@@ -18,6 +18,7 @@
         {{ field.errors }}
       </div>
     {% endfor %}
+    <datalist id="item-name-suggestions">{% for name in form.item_name_suggestions %}<option value="{{ name }}"></option>{% endfor %}</datalist>
     <div class="form-actions">
       <button type="submit">Save changes</button>
       <a class="cancel" href="{% url 'order_detail' order.pk %}">Cancel</a>

@@ -94,54 +94,61 @@ def allocate_payment(orders, kind, amount, method):
 
 
 def item_quantity_groups(orders):
-    """
-    Group orders by item name, calculate total quantities,
-    and identify the customers who ordered each item.
+    """Build a shopping list grouped by normalized item name.
+
+    Each customer is counted once per item, even when they placed multiple
+    orders. Legacy orders without item_name continue to group by item_notes.
     """
     grouped = {}
 
     for order in orders:
+        if getattr(order, "is_cancelled", False):
+            continue
         stock_item = getattr(order, "stock_item", None)
+        item_name = (getattr(order, "item_name", "") or "").strip()
 
-        if stock_item:
+        if not item_name and stock_item:
             item_name = stock_item.name.strip()
-        else:
+
+        legacy_order = not item_name
+        if legacy_order:
             item_name = (order.item_notes or "").strip()
 
         if not item_name:
             item_name = "Unnamed item"
 
         key = " ".join(item_name.casefold().split())
-
         if key not in grouped:
             grouped[key] = {
                 "name": item_name,
                 "quantity": 0,
-                "order_count": 0,
+                "people": 0,
                 "customers": {},
             }
 
         item = grouped[key]
-
         item["quantity"] += order.quantity
-        item["order_count"] += 1
 
         customer_id = order.customer_id
-
         if customer_id not in item["customers"]:
             item["customers"][customer_id] = {
-                "name": (
-                    order.customer.name
-                    or order.customer.phone
-                ),
+                "name": order.customer.name or order.customer.phone,
                 "phone": order.customer.phone,
                 "quantity": 0,
+                "details": [],
             }
+            item["people"] += 1
 
-        item["customers"][customer_id]["quantity"] += order.quantity
+        customer = item["customers"][customer_id]
+        customer["quantity"] += order.quantity
+
+        # Legacy item_notes is the complete old item description, so don't
+        # display it again as a detail when it is being used as the group name.
+        detail = "" if legacy_order else (order.item_notes or "").strip()
+        if detail and detail not in customer["details"]:
+            customer["details"].append(detail)
 
     results = []
-
     for item in grouped.values():
         item["customers"] = sorted(
             item["customers"].values(),
@@ -149,7 +156,8 @@ def item_quantity_groups(orders):
         )
         results.append(item)
 
+    # Most-wanted products (largest total quantity) appear first.
     return sorted(
         results,
-        key=lambda item: item["name"].casefold(),
+        key=lambda item: (-item["quantity"], item["name"].casefold()),
     )

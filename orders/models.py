@@ -301,7 +301,13 @@ class Order(models.Model):
         related_name="orders",
     )
     source_type = models.CharField(max_length=20, choices=SourceType.choices)
-    item_notes = models.TextField(blank=True, help_text="Colour, variant, etc.")
+    item_name = models.CharField(
+        max_length=120,
+        blank=True,
+        default="",
+        help_text="The main product name used to group shopping-list items.",
+    )
+    item_notes = models.TextField(blank=True, help_text="Colour, size, variant, or extras.")
     quantity = models.PositiveIntegerField(default=1)
 
     # Totals for the whole order line, not per unit.
@@ -409,6 +415,18 @@ class Order(models.Model):
         if new_stage:
             self.stage = new_stage
             self.save(update_fields=["stage"])
+
+    @property
+    def item_description(self):
+        """Full product description, including optional variant/details.
+
+        For legacy records, item_notes already contains the complete name.
+        """
+        name = (self.item_name or "").strip()
+        details = (self.item_notes or "").strip()
+        if name and details:
+            return f"{name} - {details}"
+        return name or details or (self.stock_item.name if self.stock_item_id else "No item description")
 
     def __str__(self):
         return f"Order {self.pk} for {self.customer}"

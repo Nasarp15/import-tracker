@@ -1,30 +1,11 @@
-
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
-*.log
-
-# Virtual environments
 venv/
-env/
-.venv/
-
-# Django database and uploads
 db.sqlite3
-db.sqlite3-journal
 media/
 staticfiles/
-
-# Environment variables and secrets
+__pycache__/
+*.pyc
 .env
-.env.*
-!.env.example
-
-# IDE and editor files
 .vscode/
 .idea/
-
-# Operating system files
 .DS_Store
 Thumbs.db

@@ -65,7 +65,7 @@ class OrderAdmin(admin.ModelAdmin):
         "created_at",
     )
     list_filter = ("stage", "source_type", "batch", "is_cancelled")
-    search_fields = ("customer__name", "customer__phone", "item_notes")
+    search_fields = ("customer__name", "customer__phone", "item_name", "item_notes")
     autocomplete_fields = ["customer"]
     inlines = [OrderPhotoInline, PaymentInline]
     actions = ["apply_suggested_fees"]

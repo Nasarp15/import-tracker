@@ -52,7 +52,7 @@
       {% for order in recent_orders %}
         <a class="dashboard-row" href="{% url 'order_detail' order.pk %}">
           <span class="row-avatar">{{ order.customer.name|default:order.customer.phone|slice:":1"|upper }}</span>
-          <span class="row-main"><strong>{{ order.customer.name|default:order.customer.phone }}</strong><small>{{ order.item_notes|default:order.get_source_type_display|truncatechars:42 }}</small></span>
+          <span class="row-main"><strong>{{ order.customer.name|default:order.customer.phone }}</strong><small>{{ order.item_description|default:order.get_source_type_display|truncatechars:42 }}</small></span>
           <span class="row-end"><span class="badge s-{{ order.stage }}">{{ order.get_stage_display }}</span><small>#{{ order.pk }}</small></span>
         </a>
       {% empty %}

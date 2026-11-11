@@ -38,7 +38,7 @@
   <p><a class="primary" href="{% url 'order_edit' order.pk %}">Edit order details</a></p>
   <div class="muted">{{ order.customer.phone }}</div>
   {% if order.address %}<p>{{ order.address.details }}</p>{% endif %}
-  <p>{{ order.item_notes|default:"No notes" }} (qty {{ order.quantity }})</p>
+  <p>{{ order.item_description }} (qty {{ order.quantity }})</p>
   <div class="muted">{{ order.get_source_type_display }}{% if order.batch %} · {{ order.batch.label }}{% endif %}</div>
 </div>
 

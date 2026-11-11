@@ -40,7 +40,7 @@
   {% for order in orders %}
     <a class="item" href="{% url 'order_detail' order.pk %}">
       <div>
-        <strong>{{ order.item_notes|truncatechars:40|default:"No notes" }}</strong>
+        <strong>{{ order.item_description|truncatechars:60 }}</strong>
         <div class="muted">qty {{ order.quantity }}{% if order.quoted_price %} · GHS {{ order.quoted_price|floatformat:"-2" }}{% endif %}{% if order.shipping_fee is not None %} · shipping GHS {{ order.shipping_fee|floatformat:"-2" }}{% endif %}</div>
       </div>
       <span class="badge s-{{ order.stage }}">{{ order.get_stage_display }}</span>

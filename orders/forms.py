@@ -17,6 +17,14 @@ from .models import (
 
 
 class OrderForm(forms.ModelForm):
+    item_name = forms.CharField(
+        label="Item name",
+        max_length=120,
+        required=False,
+        widget=forms.TextInput(
+            attrs={"list": "item-name-suggestions", "autocomplete": "off", "placeholder": "e.g. Black handbag"}
+        ),
+    )
     photo = forms.ImageField(
         label="Screenshot or photo",
         required=False,
@@ -45,6 +53,7 @@ class OrderForm(forms.ModelForm):
         "source_type",
         "stock_item",
         "batch",
+        "item_name",
         "item_notes",
         "size",
         "quantity",
@@ -59,6 +68,7 @@ class OrderForm(forms.ModelForm):
             "source_type",
             "stock_item",
             "batch",
+            "item_name",
             "item_notes",
             "quantity",
             "quoted_price",
@@ -68,14 +78,15 @@ class OrderForm(forms.ModelForm):
         labels = {
             "source_type": "Source",
             "stock_item": "Stock item (Nigeria stock sales only)",
-            "item_notes": "Item notes (colour, variant, size)",
+            "item_name": "Item name",
+            "item_notes": "Details (colour, size, variant, extras)",
             "quantity": "Quantity",
             "quoted_price": "Quoted price (total, GHS)",
             "cost": "My cost (private)",
             "cost_currency": "Cost currency",
         }
         widgets = {
-            "item_notes": forms.Textarea(attrs={"rows": 2}),
+            "item_notes": forms.Textarea(attrs={"rows": 2, "placeholder": "e.g. Large, size M, black"}),
             "quantity": forms.NumberInput(attrs={"min": 1}),
         }
 
@@ -90,8 +101,28 @@ class OrderForm(forms.ModelForm):
             )
         self.fields["stock_item"].queryset = stock_queryset
         self.fields["stock_item"].empty_label = "Not from stock"
+        used_names = list(
+            Order.objects.exclude(item_name="")
+            .values_list("item_name", flat=True)
+            .distinct()
+            .order_by("item_name")[:100]
+        )
+        legacy_names = list(
+            Order.objects.filter(item_name="")
+            .exclude(item_notes="")
+            .values_list("item_notes", flat=True)
+            .distinct()
+            .order_by("item_notes")[:100]
+        )
+        self.item_name_suggestions = list(dict.fromkeys(used_names + legacy_names))[:150]
 
         if self.instance and self.instance.pk:
+            # Older orders stored the whole item description in item_notes.
+            # Show that legacy value as the item name when editing, without
+            # requiring a data migration or losing the original description.
+            if not self.instance.item_name and self.instance.item_notes:
+                self.fields["item_name"].initial = self.instance.item_notes.strip()
+                self.fields["item_notes"].initial = ""
             self.fields["customer_phone"].initial = self.instance.customer.phone
             self.fields["customer_name"].initial = self.instance.customer.name
             if self.instance.address_id:
@@ -106,6 +137,7 @@ class OrderForm(forms.ModelForm):
     def clean(self):
         cleaned = super().clean()
         stock = cleaned.get("stock_item")
+        item_name = (cleaned.get("item_name") or "").strip()
         if stock:
             quantity = cleaned.get("quantity") or 1
             if cleaned.get("source_type") != Order.SourceType.NIGERIA_STOCK:
@@ -113,10 +145,14 @@ class OrderForm(forms.ModelForm):
             elif quantity > stock.quantity:
                 self.add_error("quantity", f"Only {stock.quantity} left in stock.")
             else:
-                if not cleaned.get("item_notes"):
-                    cleaned["item_notes"] = stock.name
+                if not item_name:
+                    item_name = stock.name.strip()
                 if cleaned.get("quoted_price") is None:
                     cleaned["quoted_price"] = stock.price * quantity
+        if not item_name:
+            self.add_error("item_name", "Enter the main item name.")
+        else:
+            cleaned["item_name"] = item_name
         size = (cleaned.get("size") or "").strip()
         if size:
             notes = cleaned.get("item_notes") or ""
